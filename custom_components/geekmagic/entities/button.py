@@ -29,21 +29,21 @@ class GeekMagicButtonEntityDescription(ButtonEntityDescription):
 DEVICE_BUTTONS: tuple[GeekMagicButtonEntityDescription, ...] = (
     GeekMagicButtonEntityDescription(
         key="refresh_now",
-        translation_key="refresh_now",
+        name="Refresh Now",
         icon="mdi:refresh",
         entity_category=EntityCategory.CONFIG,
         action="refresh",
     ),
     GeekMagicButtonEntityDescription(
         key="next_screen",
-        translation_key="next_screen",
+        name="Next Screen",
         icon="mdi:chevron-right",
         entity_category=EntityCategory.CONFIG,
         action="next_screen",
     ),
     GeekMagicButtonEntityDescription(
         key="previous_screen",
-        translation_key="previous_screen",
+        name="Previous Screen",
         icon="mdi:chevron-left",
         entity_category=EntityCategory.CONFIG,
         action="previous_screen",

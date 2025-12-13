@@ -30,13 +30,13 @@ class GeekMagicSensorEntityDescription(SensorEntityDescription):
 DEVICE_SENSORS: tuple[GeekMagicSensorEntityDescription, ...] = (
     GeekMagicSensorEntityDescription(
         key="status",
-        translation_key="status",
+        name="Status",
         icon="mdi:monitor-eye",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     GeekMagicSensorEntityDescription(
         key="current_screen_name",
-        translation_key="current_screen_name",
+        name="Current Screen",
         icon="mdi:monitor",
     ),
 )

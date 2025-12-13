@@ -33,11 +33,18 @@ async def async_setup_entry(
 
 
 class GeekMagicPreviewImage(ImageEntity):
-    """Image entity showing the GeekMagic display preview."""
+    """Image entity showing the GeekMagic display preview.
+
+    Updates only when config changes (preview_just_updated=True), not on
+    periodic coordinator refreshes. This prevents constant re-renders while
+    still showing updated previews after configuration changes.
+    """
 
     _attr_has_entity_name = True
     _attr_name = "Display Preview"
     _attr_content_type = "image/png"
+    # Disable state polling - we update via coordinator listener only on config changes
+    _attr_should_poll = False
 
     def __init__(
         self,
@@ -59,7 +66,7 @@ class GeekMagicPreviewImage(ImageEntity):
             "model": "SmallTV Pro",
         }
 
-        # Set initial timestamp if coordinator has already run
+        # Set initial timestamp
         if coordinator.last_image is not None:
             self._attr_image_last_updated = dt_util.utcnow()
 
@@ -71,17 +78,18 @@ class GeekMagicPreviewImage(ImageEntity):
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added to hass."""
         await super().async_added_to_hass()
-        # Listen to coordinator updates
+        # Listen to coordinator updates, but only act on config changes
         self.async_on_remove(self.coordinator.async_add_listener(self._handle_coordinator_update))
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        # Only update timestamp when preview actually changed
-        # (prevents constant state changes during periodic refreshes)
+        """Handle updated data from the coordinator.
+
+        Only updates state when preview_just_updated is True (config changed).
+        Periodic refreshes do NOT trigger state updates, preventing re-renders.
+        """
         if self.coordinator.preview_just_updated and self.coordinator.last_image is not None:
             self._attr_image_last_updated = dt_util.utcnow()
-            # Clear cached image to force refetch
             self._cached_image = None
             self.async_write_ha_state()
 
@@ -89,11 +97,6 @@ class GeekMagicPreviewImage(ImageEntity):
         """Return the current display preview image."""
         image = self.coordinator.last_image
         if image is not None:
-            _LOGGER.debug(
-                "Image %s: Returning image of %d bytes",
-                self._attr_unique_id,
-                len(image),
-            )
             return image
 
         _LOGGER.debug(
@@ -104,5 +107,5 @@ class GeekMagicPreviewImage(ImageEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if the image is available."""
-        return self.coordinator.last_update_success
+        """Return True if an image has been generated."""
+        return self.coordinator.last_image is not None

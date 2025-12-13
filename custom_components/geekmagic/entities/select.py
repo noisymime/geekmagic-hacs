@@ -114,7 +114,7 @@ async def async_setup_entry(
                     coordinator,
                     GeekMagicSelectEntityDescription(
                         key="current_screen",
-                        translation_key="current_screen",
+                        name="Current Screen",
                         icon="mdi:monitor",
                         entity_category=EntityCategory.CONFIG,
                         select_type="current_screen",
@@ -134,7 +134,7 @@ async def async_setup_entry(
                         coordinator,
                         GeekMagicSelectEntityDescription(
                             key=layout_key,
-                            translation_key="screen_layout",
+                            name=f"Screen {screen_idx + 1} Layout",
                             icon="mdi:view-grid",
                             entity_category=EntityCategory.CONFIG,
                             select_type="layout",
@@ -157,7 +157,7 @@ async def async_setup_entry(
                             coordinator,
                             GeekMagicSelectEntityDescription(
                                 key=widget_key,
-                                translation_key="slot_widget",
+                                name=f"Screen {screen_idx + 1} Slot {slot_idx + 1} Display",
                                 icon="mdi:widgets",
                                 entity_category=EntityCategory.CONFIG,
                                 select_type="widget_type",
@@ -177,7 +177,7 @@ async def async_setup_entry(
                             hass,
                             GeekMagicSelectEntityDescription(
                                 key=entity_key,
-                                translation_key="slot_entity",
+                                name=f"Screen {screen_idx + 1} Slot {slot_idx + 1} Entity",
                                 icon="mdi:identifier",
                                 entity_category=EntityCategory.CONFIG,
                                 select_type="entity",
@@ -285,14 +285,6 @@ class GeekMagicScreenLayoutSelect(GeekMagicSelectEntity):
                     options=new_options,
                 )
 
-    @property
-    def name(self) -> str:
-        """Return entity name with screen context."""
-        screen_idx = self.entity_description.screen_index
-        if screen_idx is not None:
-            return f"Screen {screen_idx + 1} Layout"
-        return "Layout"
-
 
 class GeekMagicSlotWidgetSelect(GeekMagicSelectEntity):
     """Select entity for slot widget type."""
@@ -369,16 +361,6 @@ class GeekMagicSlotWidgetSelect(GeekMagicSelectEntity):
                 entry,
                 options=new_options,
             )
-
-    @property
-    def name(self) -> str:
-        """Return entity name with screen and slot context."""
-        screen_idx = self.entity_description.screen_index
-        slot_idx = self.entity_description.slot_index
-        if screen_idx is not None and slot_idx is not None:
-            # "Display" sorts before "Entity" and "Label"
-            return f"Screen {screen_idx + 1} Slot {slot_idx + 1} Display"
-        return "Display"
 
 
 # Domain filters for each widget type
@@ -592,12 +574,3 @@ class GeekMagicSlotEntitySelect(GeekMagicSelectEntity):
             entry,
             options=new_options,
         )
-
-    @property
-    def name(self) -> str:
-        """Return entity name with screen and slot context."""
-        screen_idx = self.entity_description.screen_index
-        slot_idx = self.entity_description.slot_index
-        if screen_idx is not None and slot_idx is not None:
-            return f"Screen {screen_idx + 1} Slot {slot_idx + 1} Entity"
-        return "Entity"

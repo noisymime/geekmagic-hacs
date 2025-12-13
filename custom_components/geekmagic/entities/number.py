@@ -40,7 +40,7 @@ class GeekMagicNumberEntityDescription(NumberEntityDescription):
 DEVICE_NUMBERS: tuple[GeekMagicNumberEntityDescription, ...] = (
     GeekMagicNumberEntityDescription(
         key="brightness",
-        translation_key="brightness",
+        name="Brightness",
         native_min_value=0,
         native_max_value=100,
         native_step=1,
@@ -51,7 +51,7 @@ DEVICE_NUMBERS: tuple[GeekMagicNumberEntityDescription, ...] = (
     ),
     GeekMagicNumberEntityDescription(
         key="refresh_interval",
-        translation_key="refresh_interval",
+        name="Refresh Interval",
         native_min_value=5,
         native_max_value=300,
         native_step=5,
@@ -63,7 +63,7 @@ DEVICE_NUMBERS: tuple[GeekMagicNumberEntityDescription, ...] = (
     ),
     GeekMagicNumberEntityDescription(
         key="screen_cycle_interval",
-        translation_key="screen_cycle_interval",
+        name="Screen Cycle Interval",
         native_min_value=0,
         native_max_value=300,
         native_step=5,
@@ -75,7 +75,7 @@ DEVICE_NUMBERS: tuple[GeekMagicNumberEntityDescription, ...] = (
     ),
     GeekMagicNumberEntityDescription(
         key="screen_count",
-        translation_key="screen_count",
+        name="Screen Count",
         native_min_value=1,
         native_max_value=10,
         native_step=1,

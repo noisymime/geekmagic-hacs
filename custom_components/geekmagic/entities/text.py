@@ -105,7 +105,7 @@ async def async_setup_entry(
                         coordinator,
                         GeekMagicTextEntityDescription(
                             key=name_key,
-                            translation_key="screen_name",
+                            name=f"Screen {screen_idx + 1} Name",
                             icon="mdi:rename",
                             entity_category=EntityCategory.CONFIG,
                             screen_index=screen_idx,
@@ -128,7 +128,7 @@ async def async_setup_entry(
                             coordinator,
                             GeekMagicTextEntityDescription(
                                 key=label_key,
-                                translation_key="slot_label",
+                                name=f"Screen {screen_idx + 1} Slot {slot_idx + 1} Label",
                                 icon="mdi:label",
                                 entity_category=EntityCategory.CONFIG,
                                 screen_index=screen_idx,
@@ -196,14 +196,6 @@ class GeekMagicScreenNameText(GeekMagicTextEntity):
                 entry,
                 options=new_options,
             )
-
-    @property
-    def name(self) -> str:
-        """Return entity name."""
-        screen_idx = self.entity_description.screen_index
-        if screen_idx is not None:
-            return f"Screen {screen_idx + 1} Name"
-        return "Screen Name"
 
 
 class GeekMagicSlotLabelText(GeekMagicTextEntity):
@@ -274,12 +266,3 @@ class GeekMagicSlotLabelText(GeekMagicTextEntity):
             entry,
             options=new_options,
         )
-
-    @property
-    def name(self) -> str:
-        """Return entity name with screen and slot context."""
-        screen_idx = self.entity_description.screen_index
-        slot_idx = self.entity_description.slot_index
-        if screen_idx is not None and slot_idx is not None:
-            return f"Screen {screen_idx + 1} Slot {slot_idx + 1} Label"
-        return "Slot Label"
