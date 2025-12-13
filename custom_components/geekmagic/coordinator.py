@@ -26,12 +26,13 @@ from .const import (
     DOMAIN,
     LAYOUT_GRID_2X2,
     LAYOUT_GRID_2X3,
+    LAYOUT_GRID_3X2,
     LAYOUT_HERO,
     LAYOUT_SPLIT,
     LAYOUT_THREE_COLUMN,
 )
 from .device import GeekMagicDevice
-from .layouts.grid import Grid2x2, Grid2x3
+from .layouts.grid import Grid2x2, Grid2x3, Grid3x2
 from .layouts.hero import HeroLayout
 from .layouts.split import SplitLayout, ThreeColumnLayout
 from .renderer import Renderer
@@ -55,6 +56,7 @@ _LOGGER = logging.getLogger(__name__)
 LAYOUT_CLASSES = {
     LAYOUT_GRID_2X2: Grid2x2,
     LAYOUT_GRID_2X3: Grid2x3,
+    LAYOUT_GRID_3X2: Grid3x2,
     LAYOUT_HERO: HeroLayout,
     LAYOUT_SPLIT: SplitLayout,
     LAYOUT_THREE_COLUMN: ThreeColumnLayout,

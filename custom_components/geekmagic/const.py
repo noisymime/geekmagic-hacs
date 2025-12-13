@@ -28,6 +28,7 @@ DEFAULT_SCREEN_CYCLE_INTERVAL = 0  # 0 = manual only, >0 = seconds between scree
 # Layout types
 LAYOUT_GRID_2X2 = "grid_2x2"
 LAYOUT_GRID_2X3 = "grid_2x3"
+LAYOUT_GRID_3X2 = "grid_3x2"
 LAYOUT_HERO = "hero"
 LAYOUT_SPLIT = "split"
 LAYOUT_THREE_COLUMN = "three_column"
@@ -50,6 +51,7 @@ WIDGET_WEATHER = "weather"
 LAYOUT_SLOT_COUNTS = {
     LAYOUT_GRID_2X2: 4,
     LAYOUT_GRID_2X3: 6,
+    LAYOUT_GRID_3X2: 6,
     LAYOUT_HERO: 4,
     LAYOUT_SPLIT: 2,
     LAYOUT_THREE_COLUMN: 3,

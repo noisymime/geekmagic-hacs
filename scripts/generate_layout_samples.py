@@ -21,7 +21,7 @@ from custom_components.geekmagic.const import (
     COLOR_TEAL,
     COLOR_WHITE,
 )
-from custom_components.geekmagic.layouts.grid import Grid2x2, Grid2x3, Grid3x3
+from custom_components.geekmagic.layouts.grid import Grid2x2, Grid2x3, Grid3x2, Grid3x3
 from custom_components.geekmagic.layouts.hero import HeroLayout
 from custom_components.geekmagic.layouts.split import SplitLayout, ThreeColumnLayout
 from custom_components.geekmagic.renderer import Renderer
@@ -172,6 +172,38 @@ def generate_grid_2x3(renderer: Renderer, output_dir: Path) -> None:
 
     layout.render(renderer, draw, hass)  # type: ignore[arg-type]
     save_layout(renderer, img, "grid_2x3", output_dir)
+
+
+def generate_grid_3x2(renderer: Renderer, output_dir: Path) -> None:
+    """Generate Grid 3x2 layout sample (3 rows, 2 columns)."""
+    hass = create_mock_hass()
+    layout = Grid3x2(padding=8, gap=8)
+    img, draw = renderer.create_canvas()
+
+    # 6 widgets in 3x2 layout
+    configs = [
+        ("sensor.cpu", "CPU", COLOR_TEAL, "ring"),
+        ("sensor.memory", "Memory", COLOR_PURPLE, "ring"),
+        ("sensor.disk", "Disk", COLOR_ORANGE, "ring"),
+        ("sensor.battery", "Battery", COLOR_LIME, "ring"),
+        ("sensor.power", "Power", COLOR_GOLD, "bar"),
+        ("sensor.solar", "Solar", COLOR_CYAN, "bar"),
+    ]
+    for i, (entity_id, label, color, style) in enumerate(configs):
+        widget = GaugeWidget(
+            WidgetConfig(
+                widget_type="gauge",
+                slot=i,
+                entity_id=entity_id,
+                label=label,
+                color=color,
+                options={"style": style},
+            )
+        )
+        layout.set_widget(i, widget)
+
+    layout.render(renderer, draw, hass)  # type: ignore[arg-type]
+    save_layout(renderer, img, "grid_3x2", output_dir)
 
 
 def generate_grid_3x3(renderer: Renderer, output_dir: Path) -> None:
@@ -364,6 +396,7 @@ def main() -> None:
 
     generate_grid_2x2(renderer, output_dir)
     generate_grid_2x3(renderer, output_dir)
+    generate_grid_3x2(renderer, output_dir)
     generate_grid_3x3(renderer, output_dir)
     generate_hero(renderer, output_dir)
     generate_split_vertical(renderer, output_dir)
@@ -371,7 +404,7 @@ def main() -> None:
     generate_three_column(renderer, output_dir)
 
     print()
-    print(f"Done! Generated 7 layout samples in {output_dir}")
+    print(f"Done! Generated 8 layout samples in {output_dir}")
 
 
 if __name__ == "__main__":

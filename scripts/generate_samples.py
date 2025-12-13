@@ -27,7 +27,7 @@ from custom_components.geekmagic.const import (
     COLOR_WHITE,
     COLOR_YELLOW,
 )
-from custom_components.geekmagic.layouts.grid import Grid2x2, Grid2x3
+from custom_components.geekmagic.layouts.grid import Grid2x2, Grid2x3, Grid3x2
 from custom_components.geekmagic.layouts.hero import HeroLayout
 from custom_components.geekmagic.layouts.split import SplitLayout
 from custom_components.geekmagic.render_context import RenderContext
@@ -257,6 +257,7 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
         ("2x1", None, 2, 8, 8),  # 2 vertical (SplitLayout horizontal=True)
         ("2x2", Grid2x2, 4, 8, 8),
         ("2x3", Grid2x3, 6, 8, 8),
+        ("3x2", Grid3x2, 6, 8, 8),  # 3 rows, 2 columns
         ("3x3", Grid3x3, 9, 6, 6),
     ]
 
