@@ -290,209 +290,48 @@ automation:
 
 ## Widgets
 
-### Responsive Widget Layouts
+### Widget Gallery
 
-Widgets automatically adapt their layout based on cell size. Here's how each widget type looks in different grid configurations:
+Widgets automatically adapt their layout based on cell size:
 
-#### Gauge (Bar Style)
-<p align="center">
-  <img src="samples/widgets/gauge_bar_1x1.png" alt="1x1" width="80">
-  <img src="samples/widgets/gauge_bar_1x2.png" alt="1x2" width="80">
-  <img src="samples/widgets/gauge_bar_2x2.png" alt="2x2" width="80">
-  <img src="samples/widgets/gauge_bar_2x3.png" alt="2x3" width="80">
-  <img src="samples/widgets/gauge_bar_3x3.png" alt="3x3" width="80">
+| Widget | 1x1 | 1x2 | 2x1 | 2x2 | 2x3 | 3x3 |
+|--------|-----|-----|-----|-----|-----|-----|
+| **Gauge (Bar)** | <img src="samples/widgets/gauge_bar_1x1.png" width="60"> | <img src="samples/widgets/gauge_bar_1x2.png" width="60"> | <img src="samples/widgets/gauge_bar_2x1.png" width="60"> | <img src="samples/widgets/gauge_bar_2x2.png" width="60"> | <img src="samples/widgets/gauge_bar_2x3.png" width="60"> | <img src="samples/widgets/gauge_bar_3x3.png" width="60"> |
+| **Gauge (Ring)** | <img src="samples/widgets/gauge_ring_1x1.png" width="60"> | <img src="samples/widgets/gauge_ring_1x2.png" width="60"> | <img src="samples/widgets/gauge_ring_2x1.png" width="60"> | <img src="samples/widgets/gauge_ring_2x2.png" width="60"> | <img src="samples/widgets/gauge_ring_2x3.png" width="60"> | <img src="samples/widgets/gauge_ring_3x3.png" width="60"> |
+| **Entity (Icon)** | <img src="samples/widgets/entity_icon_1x1.png" width="60"> | <img src="samples/widgets/entity_icon_1x2.png" width="60"> | <img src="samples/widgets/entity_icon_2x1.png" width="60"> | <img src="samples/widgets/entity_icon_2x2.png" width="60"> | <img src="samples/widgets/entity_icon_2x3.png" width="60"> | <img src="samples/widgets/entity_icon_3x3.png" width="60"> |
+| **Entity (Plain)** | <img src="samples/widgets/entity_plain_1x1.png" width="60"> | <img src="samples/widgets/entity_plain_1x2.png" width="60"> | <img src="samples/widgets/entity_plain_2x1.png" width="60"> | <img src="samples/widgets/entity_plain_2x2.png" width="60"> | <img src="samples/widgets/entity_plain_2x3.png" width="60"> | <img src="samples/widgets/entity_plain_3x3.png" width="60"> |
+
+### Other Widgets
+
+<p>
+<img src="samples/widgets/widget_clock.png" width="100" title="Clock">
+<img src="samples/widgets/widget_media.png" width="100" title="Media">
+<img src="samples/widgets/widget_chart.png" width="100" title="Chart">
+<img src="samples/widgets/widget_text.png" width="100" title="Text">
+<img src="samples/widgets/widget_gauge_arc.png" width="100" title="Gauge Arc">
+<img src="samples/widgets/widget_progress.png" width="100" title="Progress">
+<img src="samples/widgets/widget_multi_progress.png" width="100" title="Multi-Progress">
+<img src="samples/widgets/widget_weather.png" width="100" title="Weather">
+<img src="samples/widgets/widget_status.png" width="100" title="Status">
+<img src="samples/widgets/widget_status_list.png" width="100" title="Status List">
 </p>
 
-#### Gauge (Ring Style)
-<p align="center">
-  <img src="samples/widgets/gauge_ring_1x1.png" alt="1x1" width="80">
-  <img src="samples/widgets/gauge_ring_1x2.png" alt="1x2" width="80">
-  <img src="samples/widgets/gauge_ring_2x2.png" alt="2x2" width="80">
-  <img src="samples/widgets/gauge_ring_2x3.png" alt="2x3" width="80">
-  <img src="samples/widgets/gauge_ring_3x3.png" alt="3x3" width="80">
-</p>
+### Widget Types
 
-#### Entity (with Icon)
-<p align="center">
-  <img src="samples/widgets/entity_icon_1x1.png" alt="1x1" width="80">
-  <img src="samples/widgets/entity_icon_1x2.png" alt="1x2" width="80">
-  <img src="samples/widgets/entity_icon_2x2.png" alt="2x2" width="80">
-  <img src="samples/widgets/entity_icon_2x3.png" alt="2x3" width="80">
-  <img src="samples/widgets/entity_icon_3x3.png" alt="3x3" width="80">
-</p>
-
-#### Entity (Plain)
-<p align="center">
-  <img src="samples/widgets/entity_plain_1x1.png" alt="1x1" width="80">
-  <img src="samples/widgets/entity_plain_1x2.png" alt="1x2" width="80">
-  <img src="samples/widgets/entity_plain_2x2.png" alt="2x2" width="80">
-  <img src="samples/widgets/entity_plain_2x3.png" alt="2x3" width="80">
-  <img src="samples/widgets/entity_plain_3x3.png" alt="3x3" width="80">
-</p>
-
-### Available Widget Types
-
-| Widget | Type | Description |
-|--------|------|-------------|
-| Camera | `camera` | Camera snapshot display |
-| Clock | `clock` | Current time and date |
-| Entity | `entity` | Any Home Assistant entity value |
-| Media | `media` | Now playing from media player |
-| Chart | `chart` | Sparkline chart from entity history |
-| Text | `text` | Static or dynamic text |
-| Gauge | `gauge` | Progress bar, ring, or arc gauge |
-| Progress | `progress` | Goal tracking with progress bar |
-| Multi-Progress | `multi_progress` | Multiple progress items |
-| Weather | `weather` | Weather with forecast |
-| Status | `status` | Binary sensor indicator |
-| Status List | `status_list` | Multiple status indicators |
-
-### Widget Examples
-
-#### Camera
-
-Displays a camera entity snapshot.
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `show_label` | bool | `false` | Show camera name label |
-| `fit` | string | `"contain"` | `"contain"` (preserve aspect) or `"cover"` (fill) |
-
-#### Clock
-
-Displays current time and date.
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `show_date` | bool | `true` | Show date below time |
-| `show_seconds` | bool | `false` | Include seconds |
-| `time_format` | string | `"24h"` | `"24h"` or `"12h"` |
-
-#### Entity
-
-Displays any Home Assistant entity state.
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `show_name` | bool | `true` | Show entity name |
-| `show_unit` | bool | `true` | Show unit of measurement |
-| `icon` | string | - | Icon name (e.g., `"drop"`, `"bolt"`) |
-| `show_panel` | bool | `false` | Draw panel background |
-
-#### Media Player
-
-Displays now-playing information from a media player.
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `show_artist` | bool | `true` | Show artist name |
-| `show_album` | bool | `false` | Show album name |
-| `show_progress` | bool | `true` | Show progress bar |
-
-#### Chart
-
-Displays sparkline chart from entity history.
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `hours` | int | `24` | Hours of history |
-| `show_value` | bool | `true` | Show current value |
-| `show_range` | bool | `true` | Show min/max range |
-
-#### Text
-
-Displays static or dynamic text.
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `text` | string | - | Static text to display |
-| `size` | string | `"regular"` | `"small"`, `"regular"`, `"large"`, `"xlarge"` |
-| `align` | string | `"center"` | `"left"`, `"center"`, `"right"` |
-
-#### Gauge
-<img src="samples/widgets/widget_gauge_bar.png" alt="Gauge Bar" width="160">
-<img src="samples/widgets/widget_gauge_ring.png" alt="Gauge Ring" width="100">
-<img src="samples/widgets/widget_gauge_arc.png" alt="Gauge Arc" width="120">
-
-Displays value as bar, ring, or arc gauge.
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `style` | string | `"bar"` | `"bar"`, `"ring"`, or `"arc"` |
-| `min` | float | `0` | Minimum value |
-| `max` | float | `100` | Maximum value |
-| `icon` | string | - | Icon name |
-| `unit` | string | - | Unit of measurement |
-| `attribute` | string | - | Read from entity attribute |
-
-#### Progress
-<img src="samples/widgets/widget_progress.png" alt="Progress Widget" width="180">
-
-Displays progress toward a goal.
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `target` | float | `100` | Goal value |
-| `unit` | string | - | Unit of measurement |
-| `show_target` | bool | `true` | Show "current/target" |
-| `icon` | string | - | Icon name |
-
-#### Multi-Progress
-<img src="samples/widgets/widget_multi_progress.png" alt="Multi-Progress Widget" width="180">
-
-Displays multiple progress items (fitness tracking style).
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `title` | string | - | Widget title |
-| `items` | list | - | List of progress configs |
-
-Each item in `items`:
-```yaml
-- entity_id: sensor.calories
-  label: "Move"
-  target: 800
-  color: [255, 0, 0]
-  icon: "flame"
-  unit: "cal"
-```
-
-#### Weather
-<img src="samples/widgets/widget_weather.png" alt="Weather Widget" width="180">
-
-Displays weather with forecast.
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `show_forecast` | bool | `true` | Show forecast days |
-| `forecast_days` | int | `3` | Number of forecast days |
-| `show_humidity` | bool | `true` | Show humidity |
-| `show_wind` | bool | `false` | Show wind speed |
-
-#### Status
-<img src="samples/widgets/widget_status.png" alt="Status Widget" width="140">
-
-Displays binary sensor with colored indicator.
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `on_color` | tuple | lime | Color when on |
-| `off_color` | tuple | red | Color when off |
-| `on_text` | string | `"ON"` | Text when on |
-| `off_text` | string | `"OFF"` | Text when off |
-| `icon` | string | - | Icon name |
-
-#### Status List
-<img src="samples/widgets/widget_status_list.png" alt="Status List Widget" width="160">
-
-Displays list of binary sensors.
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `title` | string | - | List title |
-| `entities` | list | - | List of entity IDs or (id, label) tuples |
-| `on_color` | tuple | lime | Color when on |
-| `off_color` | tuple | red | Color when off |
+| Type | Description |
+|------|-------------|
+| `camera` | Camera snapshot display |
+| `clock` | Time and date |
+| `entity` | Any HA entity value (with optional icon) |
+| `media` | Now playing from media player |
+| `chart` | Sparkline from entity history |
+| `text` | Static or dynamic text |
+| `gauge` | Bar, ring, or arc gauge (`style: bar/ring/arc`) |
+| `progress` | Goal tracking with progress bar |
+| `multi_progress` | Multiple progress items |
+| `weather` | Weather with forecast |
+| `status` | Binary sensor indicator |
+| `status_list` | Multiple status indicators |
 
 ---
 
