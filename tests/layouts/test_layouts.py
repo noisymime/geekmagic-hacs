@@ -115,7 +115,7 @@ class TestGridLayout:
         layout.set_widget(0, widget)
 
         layout.render(renderer, draw)
-        assert img.size == (240, 240)
+        assert img.size == (480, 480)
 
 
 class TestGrid2x2:
@@ -189,7 +189,7 @@ class TestHeroLayout:
         layout.set_widget(0, widget)
 
         layout.render(renderer, draw)
-        assert img.size == (240, 240)
+        assert img.size == (480, 480)
 
 
 class TestSplitLayout:
@@ -245,7 +245,7 @@ class TestSplitLayout:
         layout.set_widget(0, widget)
 
         layout.render(renderer, draw)
-        assert img.size == (240, 240)
+        assert img.size == (480, 480)
 
 
 class TestThreeColumnLayout:
@@ -279,7 +279,7 @@ class TestThreeColumnLayout:
         layout = ThreeColumnLayout()
 
         layout.render(renderer, draw)
-        assert img.size == (240, 240)
+        assert img.size == (480, 480)
 
 
 class TestLayoutEntityTracking:

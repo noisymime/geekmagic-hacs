@@ -1,6 +1,6 @@
-"""Cairo-based image renderer for GeekMagic displays.
+"""PIL-based image renderer for GeekMagic displays.
 
-Uses pycairo for high-quality anti-aliased vector graphics.
+Uses 2x supersampling for anti-aliased output.
 """
 
 from __future__ import annotations
@@ -9,7 +9,6 @@ import math
 from io import BytesIO
 from typing import TYPE_CHECKING
 
-import cairo
 from PIL import Image, ImageDraw, ImageFont
 
 from .const import (
@@ -26,6 +25,10 @@ from .const import (
 
 if TYPE_CHECKING:
     from PIL.ImageFont import FreeTypeFont
+
+
+# Supersampling scale for anti-aliasing
+SUPERSAMPLE_SCALE = 2
 
 
 def _load_font(size: int) -> FreeTypeFont | ImageFont.ImageFont:
@@ -46,90 +49,56 @@ def _load_font(size: int) -> FreeTypeFont | ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
-def _rgb_to_cairo(rgb: tuple[int, int, int]) -> tuple[float, float, float]:
-    """Convert RGB (0-255) to Cairo color (0-1)."""
-    return (rgb[0] / 255, rgb[1] / 255, rgb[2] / 255)
-
-
 class Renderer:
-    """Renders widgets and layouts to images using Cairo for high-quality anti-aliasing."""
+    """Renders widgets and layouts to images using PIL with supersampling."""
 
     def __init__(self) -> None:
         """Initialize the renderer with fonts."""
         self.width = DISPLAY_WIDTH
         self.height = DISPLAY_HEIGHT
+        self._scale = SUPERSAMPLE_SCALE
+        self._scaled_width = self.width * self._scale
+        self._scaled_height = self.height * self._scale
 
-        # Load fonts at different sizes (min 11px for readability on 240x240 display)
-        self.font_tiny = _load_font(11)
-        self.font_small = _load_font(13)
-        self.font_regular = _load_font(15)
-        self.font_medium = _load_font(18)
-        self.font_large = _load_font(24)
-        self.font_xlarge = _load_font(36)
-        self.font_huge = _load_font(52)
+        # Load fonts at scaled sizes (min 11px for readability on 240x240 display)
+        self.font_tiny = _load_font(11 * self._scale)
+        self.font_small = _load_font(13 * self._scale)
+        self.font_regular = _load_font(15 * self._scale)
+        self.font_medium = _load_font(18 * self._scale)
+        self.font_large = _load_font(24 * self._scale)
+        self.font_xlarge = _load_font(36 * self._scale)
+        self.font_huge = _load_font(52 * self._scale)
 
-        # Cairo surface and context (created per render)
-        self._surface: cairo.ImageSurface | None = None
-        self._ctx: cairo.Context | None = None
-        self._pil_image: Image.Image | None = None
+    def _s(self, value: float) -> int:
+        """Scale a value for supersampling."""
+        return int(value * self._scale)
+
+    def _scale_rect(self, rect: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+        """Scale a rectangle for supersampling."""
+        return (self._s(rect[0]), self._s(rect[1]), self._s(rect[2]), self._s(rect[3]))
+
+    def _scale_point(self, point: tuple[int, int]) -> tuple[int, int]:
+        """Scale a point for supersampling."""
+        return (self._s(point[0]), self._s(point[1]))
 
     def create_canvas(
         self, background: tuple[int, int, int] = COLOR_BLACK
     ) -> tuple[Image.Image, ImageDraw.ImageDraw]:
-        """Create a new image canvas.
-
-        Returns PIL Image and ImageDraw for API compatibility.
-        Cairo context is stored internally.
+        """Create a new image canvas at supersampled resolution.
 
         Args:
             background: RGB background color tuple
 
         Returns:
-            Tuple of (Image, ImageDraw) - ImageDraw is a proxy that uses Cairo
+            Tuple of (Image, ImageDraw)
         """
-        # Create Cairo surface
-        self._surface = cairo.ImageSurface(cairo.FORMAT_RGB24, self.width, self.height)
-        self._ctx = cairo.Context(self._surface)
+        img = Image.new("RGB", (self._scaled_width, self._scaled_height), background)
+        draw = ImageDraw.Draw(img)
+        return img, draw
 
-        # Set best anti-aliasing
-        self._ctx.set_antialias(cairo.ANTIALIAS_BEST)
-
-        # Fill background
-        self._ctx.set_source_rgb(*_rgb_to_cairo(background))
-        self._ctx.paint()
-
-        # Create PIL image for text rendering (Cairo font handling is complex)
-        self._pil_image = Image.new("RGB", (self.width, self.height), background)
-        pil_draw = ImageDraw.Draw(self._pil_image)
-
-        return self._pil_image, pil_draw
-
-    def _sync_cairo_to_pil(self) -> None:
-        """Copy Cairo surface to PIL image."""
-        if self._surface is None or self._pil_image is None:
-            return
-
-        # Get Cairo surface data and copy to PIL
-        data = bytes(self._surface.get_data())
-        cairo_img = Image.frombuffer("RGBA", (self.width, self.height), data, "raw", "BGRA", 0, 1)
-        # Paste Cairo content onto PIL image (preserving text)
-        self._pil_image.paste(cairo_img.convert("RGB"))
-
-    def _sync_pil_to_cairo(self) -> None:
-        """Copy PIL image to Cairo surface for compositing."""
-        if self._surface is None or self._pil_image is None or self._ctx is None:
-            return
-
-        # Convert PIL to BGRA for Cairo
-        img_rgba = self._pil_image.convert("RGBA")
-        data = img_rgba.tobytes("raw", "BGRA")
-
-        # Create temporary surface and paint onto main surface
-        temp_surface = cairo.ImageSurface.create_for_data(
-            bytearray(data), cairo.FORMAT_ARGB32, self.width, self.height
-        )
-        self._ctx.set_source_surface(temp_surface, 0, 0)
-        self._ctx.paint()
+    def _downscale(self, img: Image.Image) -> Image.Image:
+        """Downscale supersampled image to final resolution with anti-aliasing."""
+        return img.resize((self.width, self.height), Image.Resampling.LANCZOS)
 
     def draw_text(
         self,
@@ -140,19 +109,20 @@ class Renderer:
         color: tuple[int, int, int] = COLOR_WHITE,
         anchor: str | None = None,
     ) -> None:
-        """Draw text on the canvas using PIL for consistent fonts.
+        """Draw text on the canvas.
 
         Args:
             draw: ImageDraw instance
             text: Text to draw
-            position: (x, y) position
+            position: (x, y) position (will be scaled)
             font: Font to use (default: regular)
             color: RGB color tuple
             anchor: Text anchor (e.g., "mm" for center)
         """
         if font is None:
             font = self.font_regular
-        draw.text(position, text, font=font, fill=color, anchor=anchor)
+        scaled_pos = self._scale_point(position)
+        draw.text(scaled_pos, text, font=font, fill=color, anchor=anchor)
 
     def draw_rect(
         self,
@@ -162,32 +132,17 @@ class Renderer:
         outline: tuple[int, int, int] | None = None,
         width: int = 1,
     ) -> None:
-        """Draw a rectangle using Cairo.
+        """Draw a rectangle.
 
         Args:
-            draw: ImageDraw instance (unused, for API compatibility)
+            draw: ImageDraw instance
             rect: (x1, y1, x2, y2) coordinates
             fill: Fill color
             outline: Outline color
             width: Outline width
         """
-        if self._ctx is None:
-            return
-
-        x1, y1, x2, y2 = rect
-        self._ctx.rectangle(x1, y1, x2 - x1, y2 - y1)
-
-        if fill:
-            self._ctx.set_source_rgb(*_rgb_to_cairo(fill))
-            if outline:
-                self._ctx.fill_preserve()
-            else:
-                self._ctx.fill()
-
-        if outline:
-            self._ctx.set_source_rgb(*_rgb_to_cairo(outline))
-            self._ctx.set_line_width(width)
-            self._ctx.stroke()
+        scaled_rect = self._scale_rect(rect)
+        draw.rectangle(scaled_rect, fill=fill, outline=outline, width=self._s(width))
 
     def draw_rounded_rect(
         self,
@@ -198,45 +153,24 @@ class Renderer:
         outline: tuple[int, int, int] | None = None,
         width: int = 1,
     ) -> None:
-        """Draw a rounded rectangle with smooth anti-aliased corners.
+        """Draw a rounded rectangle.
 
         Args:
-            draw: ImageDraw instance (unused, for API compatibility)
+            draw: ImageDraw instance
             rect: (x1, y1, x2, y2) coordinates
             radius: Corner radius
             fill: Fill color
             outline: Outline color
             width: Outline width
         """
-        if self._ctx is None:
-            return
-
-        x1, y1, x2, y2 = rect
-        w = x2 - x1
-        h = y2 - y1
-
-        # Limit radius
-        r = min(radius, w / 2, h / 2)
-
-        # Draw rounded rectangle path
-        self._ctx.new_path()
-        self._ctx.arc(x1 + r, y1 + r, r, math.pi, 1.5 * math.pi)
-        self._ctx.arc(x2 - r, y1 + r, r, 1.5 * math.pi, 2 * math.pi)
-        self._ctx.arc(x2 - r, y2 - r, r, 0, 0.5 * math.pi)
-        self._ctx.arc(x1 + r, y2 - r, r, 0.5 * math.pi, math.pi)
-        self._ctx.close_path()
-
-        if fill:
-            self._ctx.set_source_rgb(*_rgb_to_cairo(fill))
-            if outline:
-                self._ctx.fill_preserve()
-            else:
-                self._ctx.fill()
-
-        if outline:
-            self._ctx.set_source_rgb(*_rgb_to_cairo(outline))
-            self._ctx.set_line_width(width)
-            self._ctx.stroke()
+        scaled_rect = self._scale_rect(rect)
+        draw.rounded_rectangle(
+            scaled_rect,
+            radius=self._s(radius),
+            fill=fill,
+            outline=outline,
+            width=self._s(width),
+        )
 
     def draw_bar(
         self,
@@ -330,20 +264,22 @@ class Renderer:
         fill: bool = True,
         smooth: bool = True,
     ) -> None:
-        """Draw a smooth anti-aliased sparkline chart using Cairo.
+        """Draw a sparkline chart with optional smoothing.
 
         Args:
-            draw: ImageDraw instance (unused, for API compatibility)
+            draw: ImageDraw instance
             rect: (x1, y1, x2, y2) bounding box
             data: List of data points
             color: Line color
             fill: Whether to fill area under the line
             smooth: Whether to use spline interpolation for smooth curves
         """
-        if not data or len(data) < 2 or self._ctx is None:
+        if not data or len(data) < 2:
             return
 
         x1, y1, x2, y2 = rect
+        # Scale coordinates
+        x1, y1, x2, y2 = self._s(x1), self._s(y1), self._s(x2), self._s(y2)
         width = x2 - x1
         height = y2 - y1
 
@@ -366,30 +302,18 @@ class Renderer:
         else:
             points = control_points
 
+        # Convert to integer tuples
+        int_points = [(int(p[0]), int(p[1])) for p in points]
+
         # Draw filled area
         if fill:
-            self._ctx.new_path()
-            self._ctx.move_to(x1, y2)
-            for p in points:
-                self._ctx.line_to(p[0], p[1])
-            self._ctx.line_to(x2, y2)
-            self._ctx.close_path()
-
-            fill_color = _rgb_to_cairo((color[0] // 4, color[1] // 4, color[2] // 4))
-            self._ctx.set_source_rgb(*fill_color)
-            self._ctx.fill()
+            fill_points = [(x1, y2), *int_points, (x2, y2)]
+            fill_color = (color[0] // 4, color[1] // 4, color[2] // 4)
+            draw.polygon(fill_points, fill=fill_color)
 
         # Draw line
-        if len(points) >= 2:
-            self._ctx.set_source_rgb(*_rgb_to_cairo(color))
-            self._ctx.set_line_width(2)
-            self._ctx.set_line_cap(cairo.LINE_CAP_ROUND)
-            self._ctx.set_line_join(cairo.LINE_JOIN_ROUND)
-
-            self._ctx.move_to(points[0][0], points[0][1])
-            for p in points[1:]:
-                self._ctx.line_to(p[0], p[1])
-            self._ctx.stroke()
+        if len(int_points) >= 2:
+            draw.line(int_points, fill=color, width=self._s(2))
 
     def draw_arc(
         self,
@@ -400,37 +324,26 @@ class Renderer:
         background: tuple[int, int, int] = COLOR_GRAY,
         width: int = 8,
     ) -> None:
-        """Draw a circular arc gauge using Cairo for smooth anti-aliasing.
+        """Draw a circular arc gauge.
 
         Args:
-            draw: ImageDraw instance (unused, for API compatibility)
+            draw: ImageDraw instance
             rect: (x1, y1, x2, y2) bounding box
             percent: Fill percentage (0-100)
             color: Arc color
             background: Background arc color
             width: Arc line width
         """
-        if self._ctx is None:
-            return
-
-        x1, y1, x2, y2 = rect
-        cx = (x1 + x2) / 2
-        cy = (y1 + y2) / 2
-        radius = (x2 - x1) / 2
+        scaled_rect = self._scale_rect(rect)
+        scaled_width = self._s(width)
 
         # Draw background arc (270 degree sweep from bottom-left)
-        self._ctx.set_source_rgb(*_rgb_to_cairo(background))
-        self._ctx.set_line_width(width)
-        self._ctx.set_line_cap(cairo.LINE_CAP_ROUND)
-        self._ctx.arc(cx, cy, radius, math.radians(135), math.radians(405))
-        self._ctx.stroke()
+        draw.arc(scaled_rect, start=135, end=405, fill=background, width=scaled_width)
 
         # Draw progress arc
         if percent > 0:
-            self._ctx.set_source_rgb(*_rgb_to_cairo(color))
             end_angle = 135 + (percent / 100) * 270
-            self._ctx.arc(cx, cy, radius, math.radians(135), math.radians(end_angle))
-            self._ctx.stroke()
+            draw.arc(scaled_rect, start=135, end=end_angle, fill=color, width=scaled_width)
 
     def draw_ring_gauge(
         self,
@@ -442,10 +355,10 @@ class Renderer:
         background: tuple[int, int, int] = COLOR_DARK_GRAY,
         width: int = 6,
     ) -> None:
-        """Draw a full circular ring gauge (360 degrees) using Cairo.
+        """Draw a full circular ring gauge (360 degrees).
 
         Args:
-            draw: ImageDraw instance (unused, for API compatibility)
+            draw: ImageDraw instance
             center: (x, y) center point
             radius: Ring radius
             percent: Fill percentage (0-100)
@@ -453,25 +366,22 @@ class Renderer:
             background: Background ring color
             width: Ring thickness
         """
-        if self._ctx is None:
-            return
+        cx, cy = self._scale_point(center)
+        r = self._s(radius)
+        w = self._s(width)
 
-        x, y = center
+        bbox = (cx - r, cy - r, cx + r, cy + r)
 
         # Draw background ring (full circle)
-        self._ctx.set_source_rgb(*_rgb_to_cairo(background))
-        self._ctx.set_line_width(width)
-        self._ctx.set_line_cap(cairo.LINE_CAP_ROUND)
-        self._ctx.arc(x, y, radius, 0, 2 * math.pi)
-        self._ctx.stroke()
+        draw.arc(bbox, start=0, end=360, fill=background, width=w)
 
         # Draw progress ring (starting from top, -90 degrees)
         if percent > 0:
-            self._ctx.set_source_rgb(*_rgb_to_cairo(color))
-            start_angle = -math.pi / 2
-            end_angle = start_angle + (percent / 100) * 2 * math.pi
-            self._ctx.arc(x, y, radius, start_angle, end_angle)
-            self._ctx.stroke()
+            # PIL arc starts at 3 o'clock and goes clockwise
+            # We want to start at 12 o'clock (-90 degrees)
+            start = -90
+            end = start + (percent / 100) * 360
+            draw.arc(bbox, start=start, end=end, fill=color, width=w)
 
     def draw_segmented_bar(
         self,
@@ -498,8 +408,8 @@ class Renderer:
 
         # Draw segments
         current_x = x1
-        for percent, seg_color in segments:
-            seg_width = int(total_width * (percent / 100))
+        for seg_percent, seg_color in segments:
+            seg_width = int(total_width * (seg_percent / 100))
             if seg_width > 0 and current_x < x2:
                 seg_rect = (current_x, y1, min(current_x + seg_width, x2), y2)
                 self.draw_rect(draw, seg_rect, fill=seg_color)
@@ -515,7 +425,7 @@ class Renderer:
         bar_width: int = 3,
         gap: int = 1,
     ) -> None:
-        """Draw a mini bar chart (vertical bars) using Cairo.
+        """Draw a mini bar chart (vertical bars).
 
         Args:
             draw: ImageDraw instance
@@ -526,11 +436,13 @@ class Renderer:
             bar_width: Width of each bar
             gap: Gap between bars
         """
-        if not data or self._ctx is None:
+        if not data:
             return
 
-        x1, y1, x2, y2 = rect
+        x1, y1, x2, y2 = self._scale_rect(rect)
         height = y2 - y1
+        bw = self._s(bar_width)
+        g = self._s(gap)
 
         # Normalize data
         max_val = max(data) if max(data) > 0 else 1
@@ -539,26 +451,23 @@ class Renderer:
 
         # Calculate how many bars fit
         available_width = x2 - x1
-        num_bars = min(len(data), available_width // (bar_width + gap))
+        num_bars = min(len(data), available_width // (bw + g))
 
         # Use last N data points if we have more data than space
         if len(data) > num_bars:
             data = data[-num_bars:]
 
-        self._ctx.set_source_rgb(*_rgb_to_cairo(color))
-
         # Draw bars from right to left (most recent on right)
         for i, value in enumerate(reversed(data)):
-            bar_x = x2 - (i + 1) * (bar_width + gap)
+            bar_x = x2 - (i + 1) * (bw + g)
             if bar_x < x1:
                 break
 
             bar_height = int(((value - min_val) / range_val) * height * 0.9)
-            bar_height = max(bar_height, 2)
+            bar_height = max(bar_height, self._s(2))
 
             bar_y = y2 - bar_height
-            self._ctx.rectangle(bar_x, bar_y, bar_width, bar_height)
-            self._ctx.fill()
+            draw.rectangle((bar_x, bar_y, bar_x + bw, y2), fill=color)
 
     def draw_panel(
         self,
@@ -587,41 +496,17 @@ class Renderer:
         outline: tuple[int, int, int] | None = None,
         width: int = 1,
     ) -> None:
-        """Draw an anti-aliased ellipse using Cairo.
+        """Draw an ellipse.
 
         Args:
-            draw: ImageDraw instance (unused, for API compatibility)
+            draw: ImageDraw instance
             rect: (x1, y1, x2, y2) bounding box
             fill: Fill color
             outline: Outline color
             width: Outline width
         """
-        if self._ctx is None:
-            return
-
-        x1, y1, x2, y2 = rect
-        cx = (x1 + x2) / 2
-        cy = (y1 + y2) / 2
-        rx = (x2 - x1) / 2
-        ry = (y2 - y1) / 2
-
-        self._ctx.save()
-        self._ctx.translate(cx, cy)
-        self._ctx.scale(rx, ry)
-        self._ctx.arc(0, 0, 1, 0, 2 * math.pi)
-        self._ctx.restore()
-
-        if fill:
-            self._ctx.set_source_rgb(*_rgb_to_cairo(fill))
-            if outline:
-                self._ctx.fill_preserve()
-            else:
-                self._ctx.fill()
-
-        if outline:
-            self._ctx.set_source_rgb(*_rgb_to_cairo(outline))
-            self._ctx.set_line_width(width)
-            self._ctx.stroke()
+        scaled_rect = self._scale_rect(rect)
+        draw.ellipse(scaled_rect, fill=fill, outline=outline, width=self._s(width))
 
     def draw_line(
         self,
@@ -630,27 +515,19 @@ class Renderer:
         fill: tuple[int, int, int] | None = None,
         width: int = 1,
     ) -> None:
-        """Draw anti-aliased lines using Cairo.
+        """Draw lines.
 
         Args:
-            draw: ImageDraw instance (unused, for API compatibility)
+            draw: ImageDraw instance
             xy: List of (x, y) points
             fill: Line color
             width: Line width
         """
-        if self._ctx is None or not xy or len(xy) < 2:
+        if not xy or len(xy) < 2:
             return
 
-        if fill:
-            self._ctx.set_source_rgb(*_rgb_to_cairo(fill))
-        self._ctx.set_line_width(width)
-        self._ctx.set_line_cap(cairo.LINE_CAP_ROUND)
-        self._ctx.set_line_join(cairo.LINE_JOIN_ROUND)
-
-        self._ctx.move_to(xy[0][0], xy[0][1])
-        for p in xy[1:]:
-            self._ctx.line_to(p[0], p[1])
-        self._ctx.stroke()
+        scaled_xy = [self._scale_point(p) for p in xy]
+        draw.line(scaled_xy, fill=fill, width=self._s(width))
 
     def draw_icon(
         self,
@@ -660,7 +537,7 @@ class Renderer:
         size: int = 16,
         color: tuple[int, int, int] = COLOR_WHITE,
     ) -> None:
-        """Draw a simple geometric icon using Cairo.
+        """Draw a simple geometric icon.
 
         Args:
             draw: ImageDraw instance
@@ -669,111 +546,143 @@ class Renderer:
             size: Icon size
             color: Icon color
         """
-        if self._ctx is None:
-            return
-
-        x, y = position
-        s = size
+        x, y = self._scale_point(position)
+        s = self._s(size)
         half = s // 2
         quarter = s // 4
 
-        self._ctx.set_source_rgb(*_rgb_to_cairo(color))
-        self._ctx.set_line_width(1)
-
         if icon == "cpu":
             # CPU chip icon
-            self._ctx.rectangle(x + quarter, y + quarter, s - 2 * quarter, s - 2 * quarter)
-            self._ctx.stroke()
+            draw.rectangle(
+                (x + quarter, y + quarter, x + s - quarter, y + s - quarter), outline=color
+            )
             for i in range(3):
                 px = x + quarter + (i * quarter)
-                self._ctx.move_to(px, y)
-                self._ctx.line_to(px, y + quarter)
-                self._ctx.move_to(px, y + s - quarter)
-                self._ctx.line_to(px, y + s)
-            self._ctx.stroke()
+                draw.line([(px, y), (px, y + quarter)], fill=color)
+                draw.line([(px, y + s - quarter), (px, y + s)], fill=color)
 
         elif icon == "memory":
-            self._ctx.rectangle(x + 2, y + quarter, s - 4, s - 2 * quarter)
-            self._ctx.stroke()
+            draw.rectangle((x + 2, y + quarter, x + s - 4, y + s - quarter), outline=color)
             for i in range(3):
                 cx = x + 4 + i * (quarter + 1)
-                self._ctx.rectangle(cx, y + quarter + 2, 2, s - 2 * quarter - 4)
-                self._ctx.fill()
+                draw.rectangle((cx, y + quarter + 2, cx + 2, y + s - quarter - 4), fill=color)
 
         elif icon == "disk":
             self.draw_rounded_rect(
-                draw, (x + 1, y + quarter, x + s - 1, y + s - quarter), radius=2, outline=color
+                draw,
+                (
+                    position[0] + 1,
+                    position[1] + size // 4,
+                    position[0] + size - 1,
+                    position[1] + size - size // 4,
+                ),
+                radius=2,
+                outline=color,
             )
             self.draw_ellipse(
                 draw,
-                (x + s - quarter - 2, y + half - 2, x + s - quarter + 2, y + half + 2),
+                (
+                    position[0] + size - size // 4 - 2,
+                    position[1] + size // 2 - 2,
+                    position[0] + size - size // 4 + 2,
+                    position[1] + size // 2 + 2,
+                ),
                 fill=color,
             )
 
         elif icon == "temp":
             cx = x + half
-            self.draw_ellipse(draw, (cx - 3, y + s - 7, cx + 3, y + s - 1), outline=color)
-            self._ctx.rectangle(cx - 2, y + 2, 4, s - 7)
-            self._ctx.stroke()
-            self._ctx.rectangle(cx - 1, y + half, 2, s - half - 4)
-            self._ctx.fill()
+            self.draw_ellipse(
+                draw,
+                (
+                    position[0] + half - 3,
+                    position[1] + size - 7,
+                    position[0] + half + 3,
+                    position[1] + size - 1,
+                ),
+                outline=color,
+            )
+            draw.rectangle(
+                (cx - self._s(2), y + self._s(2), cx + self._s(2), y + s - self._s(7)),
+                outline=color,
+            )
+            draw.rectangle(
+                (cx - self._s(1), y + half, cx + self._s(1), y + s - self._s(4)), fill=color
+            )
 
         elif icon in {"power", "bolt"}:
             points = [
-                (x + half + 1, y),
-                (x + 2, y + half),
-                (x + half - 1, y + half),
-                (x + half - 3, y + s),
-                (x + s - 2, y + half - 2),
-                (x + half + 1, y + half - 2),
+                (x + half + self._s(1), y),
+                (x + self._s(2), y + half),
+                (x + half - self._s(1), y + half),
+                (x + half - self._s(3), y + s),
+                (x + s - self._s(2), y + half - self._s(2)),
+                (x + half + self._s(1), y + half - self._s(2)),
             ]
-            self._ctx.move_to(points[0][0], points[0][1])
-            for p in points[1:]:
-                self._ctx.line_to(p[0], p[1])
-            self._ctx.close_path()
-            self._ctx.fill()
+            draw.polygon(points, fill=color)
 
         elif icon == "network":
             cx = x + half
             for i, r in enumerate([6, 4, 2]):
-                self._ctx.arc(cx, y + 2 + i * 2 + r, r, math.radians(220), math.radians(320))
-                self._ctx.stroke()
-            self.draw_ellipse(draw, (cx - 1, y + s - 4, cx + 1, y + s - 2), fill=color)
+                sr = self._s(r)
+                arc_y = y + self._s(2 + i * 2) + sr
+                bbox = (cx - sr, arc_y - sr, cx + sr, arc_y + sr)
+                draw.arc(bbox, start=220, end=320, fill=color, width=self._s(1))
+            self.draw_ellipse(
+                draw,
+                (
+                    position[0] + half - 1,
+                    position[1] + size - 4,
+                    position[0] + half + 1,
+                    position[1] + size - 2,
+                ),
+                fill=color,
+            )
 
         elif icon == "home":
             cx = x + half
-            self._ctx.move_to(cx, y + 1)
-            self._ctx.line_to(x + 1, y + half)
-            self._ctx.line_to(x + s - 1, y + half)
-            self._ctx.close_path()
-            self._ctx.stroke()
-            self._ctx.rectangle(x + 3, y + half, s - 6, s - half - 1)
-            self._ctx.stroke()
+            # Roof
+            draw.polygon(
+                [(cx, y + self._s(1)), (x + self._s(1), y + half), (x + s - self._s(1), y + half)],
+                outline=color,
+            )
+            # House body
+            draw.rectangle(
+                (x + self._s(3), y + half, x + s - self._s(3), y + s - self._s(1)), outline=color
+            )
 
         elif icon == "sun":
             cx, cy = x + half, y + half
             r = quarter
-            self._ctx.arc(cx, cy, r, 0, 2 * math.pi)
-            self._ctx.stroke()
+            # Circle
+            draw.ellipse((cx - r, cy - r, cx + r, cy + r), outline=color)
+            # Rays
             for angle in range(0, 360, 45):
                 rad = math.radians(angle)
-                x1 = cx + int((r + 2) * math.cos(rad))
-                y1 = cy + int((r + 2) * math.sin(rad))
-                x2 = cx + int((r + 4) * math.cos(rad))
-                y2 = cy + int((r + 4) * math.sin(rad))
-                self._ctx.move_to(x1, y1)
-                self._ctx.line_to(x2, y2)
-            self._ctx.stroke()
+                x1 = cx + int((r + self._s(2)) * math.cos(rad))
+                y1 = cy + int((r + self._s(2)) * math.sin(rad))
+                x2 = cx + int((r + self._s(4)) * math.cos(rad))
+                y2 = cy + int((r + self._s(4)) * math.sin(rad))
+                draw.line([(x1, y1), (x2, y2)], fill=color)
 
         elif icon == "drop":
             cx = x + half
-            self._ctx.move_to(cx, y + 1)
-            self._ctx.line_to(x + 2, y + s - 4)
-            self._ctx.line_to(x + s - 2, y + s - 4)
-            self._ctx.close_path()
-            self._ctx.stroke()
-            self._ctx.arc(cx, y + s - 4, (s - 4) / 2, 0, math.pi)
-            self._ctx.stroke()
+            # Water drop shape
+            draw.polygon(
+                [
+                    (cx, y + self._s(1)),
+                    (x + self._s(2), y + s - self._s(4)),
+                    (x + s - self._s(2), y + s - self._s(4)),
+                ],
+                outline=color,
+            )
+            r = (s - self._s(4)) // 2
+            draw.arc(
+                (cx - r, y + s - self._s(4) - r, cx + r, y + s - self._s(4) + r),
+                start=0,
+                end=180,
+                fill=color,
+            )
 
     def dim_color(self, color: tuple[int, int, int], factor: float = 0.3) -> tuple[int, int, int]:
         """Dim a color by a factor.
@@ -825,53 +734,26 @@ class Renderer:
             font: Font to use
 
         Returns:
-            (width, height) tuple
+            (width, height) tuple (in final resolution)
         """
         if font is None:
             font = self.font_regular
 
         bbox = font.getbbox(text)
         if bbox:
-            return int(bbox[2] - bbox[0]), int(bbox[3] - bbox[1])
+            return int((bbox[2] - bbox[0]) / self._scale), int((bbox[3] - bbox[1]) / self._scale)
         return 0, 0
 
     def finalize(self, img: Image.Image) -> Image.Image:
-        """Finalize rendering by compositing Cairo and PIL layers.
+        """Finalize rendering by downscaling supersampled image.
 
         Args:
-            img: PIL Image (with text)
+            img: PIL Image at supersampled resolution
 
         Returns:
-            Final composited image
+            Final anti-aliased image at display resolution
         """
-        if self._surface is None or self._ctx is None:
-            return img
-
-        # Get Cairo surface as PIL
-        data = bytes(self._surface.get_data())
-        cairo_img = Image.frombuffer(
-            "RGBA", (self.width, self.height), data, "raw", "BGRA", 0, 1
-        ).convert("RGB")
-
-        # Composite: Cairo graphics with PIL text on top
-        # For areas where PIL has content (text), use PIL; otherwise use Cairo
-        # Simple approach: blend Cairo under PIL
-        result = cairo_img.copy()
-
-        # Overlay text from PIL image
-        # We use the original PIL image which has text on black background
-        # Only copy non-black pixels (text)
-        pil_data = img.load()
-        result_data = result.load()
-        if pil_data is not None and result_data is not None:
-            for y_px in range(self.height):
-                for x_px in range(self.width):
-                    pil_pixel = pil_data[x_px, y_px]
-                    # If PIL pixel is not black, it's likely text - use it
-                    if pil_pixel != (0, 0, 0):
-                        result_data[x_px, y_px] = pil_pixel
-
-        return result
+        return self._downscale(img)
 
     def to_jpeg(
         self,
@@ -894,7 +776,7 @@ class Renderer:
         if max_size is None:
             max_size = MAX_IMAGE_SIZE
 
-        # Finalize compositing before export
+        # Finalize (downscale) before export
         final_img = self.finalize(img)
 
         # Try at requested quality first
@@ -921,7 +803,7 @@ class Renderer:
         Returns:
             PNG image bytes
         """
-        # Finalize compositing before export
+        # Finalize (downscale) before export
         final_img = self.finalize(img)
         buffer = BytesIO()
         final_img.save(buffer, format="PNG")

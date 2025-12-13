@@ -125,7 +125,7 @@ class TestClockWidget:
         widget.render(renderer, draw, rect)
 
         # Verify image is valid
-        assert img.size == (240, 240)
+        assert img.size == (480, 480)
 
     def test_render_24h(self, renderer, canvas, rect):
         """Test clock with 24-hour format."""
@@ -137,7 +137,7 @@ class TestClockWidget:
         )
         widget = ClockWidget(config)
         widget.render(renderer, draw, rect)
-        assert img.size == (240, 240)
+        assert img.size == (480, 480)
 
     def test_render_12h(self, renderer, canvas, rect):
         """Test clock with 12-hour format."""
@@ -149,7 +149,7 @@ class TestClockWidget:
         )
         widget = ClockWidget(config)
         widget.render(renderer, draw, rect)
-        assert img.size == (240, 240)
+        assert img.size == (480, 480)
 
 
 class TestEntityWidget:
@@ -186,7 +186,7 @@ class TestEntityWidget:
         )
         widget = EntityWidget(config)
         widget.render(renderer, draw, rect)
-        assert img.size == (240, 240)
+        assert img.size == (480, 480)
 
     def test_render_with_entity(self, renderer, canvas, rect, mock_hass, mock_entity_state):
         """Test rendering with entity state."""
@@ -200,7 +200,7 @@ class TestEntityWidget:
         )
         widget = EntityWidget(config)
         widget.render(renderer, draw, rect, hass=mock_hass)
-        assert img.size == (240, 240)
+        assert img.size == (480, 480)
 
 
 class TestMediaWidget:
@@ -232,7 +232,7 @@ class TestMediaWidget:
         )
         widget = MediaWidget(config)
         widget.render(renderer, draw, rect, hass=mock_hass)
-        assert img.size == (240, 240)
+        assert img.size == (480, 480)
 
     def test_render_playing(self, renderer, canvas, rect, mock_hass):
         """Test rendering playing state."""
@@ -255,7 +255,7 @@ class TestMediaWidget:
         )
         widget = MediaWidget(config)
         widget.render(renderer, draw, rect, hass=mock_hass)
-        assert img.size == (240, 240)
+        assert img.size == (480, 480)
 
     def test_format_time(self):
         """Test time formatting."""
@@ -300,7 +300,7 @@ class TestChartWidget:
         )
         widget = ChartWidget(config)
         widget.render(renderer, draw, rect)
-        assert img.size == (240, 240)
+        assert img.size == (480, 480)
 
     def test_render_with_data(self, renderer, canvas, rect, mock_hass, mock_entity_state):
         """Test rendering with history data."""
@@ -315,7 +315,7 @@ class TestChartWidget:
         widget = ChartWidget(config)
         widget.set_history([20.0, 21.5, 22.0, 21.0, 23.5, 24.0, 23.0])
         widget.render(renderer, draw, rect, hass=mock_hass)
-        assert img.size == (240, 240)
+        assert img.size == (480, 480)
 
 
 class TestTextWidget:
@@ -343,7 +343,7 @@ class TestTextWidget:
         )
         widget = TextWidget(config)
         widget.render(renderer, draw, rect)
-        assert img.size == (240, 240)
+        assert img.size == (480, 480)
 
     def test_render_entity_text(self, renderer, canvas, rect, mock_hass, mock_entity_state):
         """Test rendering entity state as text."""
@@ -357,7 +357,7 @@ class TestTextWidget:
         )
         widget = TextWidget(config)
         widget.render(renderer, draw, rect, hass=mock_hass)
-        assert img.size == (240, 240)
+        assert img.size == (480, 480)
 
     def test_different_alignments(self, renderer, canvas, rect):
         """Test different text alignments."""
@@ -370,7 +370,7 @@ class TestTextWidget:
             )
             widget = TextWidget(config)
             widget.render(renderer, draw, rect)
-            assert img.size == (240, 240)
+            assert img.size == (480, 480)
 
     def test_different_sizes(self, renderer, canvas, rect):
         """Test different text sizes."""
@@ -383,4 +383,4 @@ class TestTextWidget:
             )
             widget = TextWidget(config)
             widget.render(renderer, draw, rect)
-            assert img.size == (240, 240)
+            assert img.size == (480, 480)
