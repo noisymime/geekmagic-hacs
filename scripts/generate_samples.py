@@ -66,6 +66,115 @@ def save_image(renderer: Renderer, img: Image.Image, name: str, output_dir: Path
     print(f"Generated: {output_path}")
 
 
+def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
+    """Generate full 240x240 layouts showing each widget type in different grid sizes."""
+    from custom_components.geekmagic.layouts.grid import Grid3x3
+
+    widgets_dir = output_dir / "widgets"
+    widgets_dir.mkdir(exist_ok=True)
+
+    hass = MockHass()
+    hass.states.set("sensor.cpu", "73", {"unit_of_measurement": "%", "friendly_name": "CPU Usage"})
+    hass.states.set(
+        "sensor.temp", "23.5", {"unit_of_measurement": "°C", "friendly_name": "Temperature"}
+    )
+
+    def make_gauge_bar(slot: int) -> GaugeWidget:
+        return GaugeWidget(
+            WidgetConfig(
+                widget_type="gauge",
+                slot=slot,
+                entity_id="sensor.cpu",
+                label="CPU",
+                color=COLOR_CYAN,
+                options={"style": "bar", "icon": "cpu"},
+            )
+        )
+
+    def make_gauge_ring(slot: int) -> GaugeWidget:
+        return GaugeWidget(
+            WidgetConfig(
+                widget_type="gauge",
+                slot=slot,
+                entity_id="sensor.cpu",
+                label="CPU",
+                color=COLOR_LIME,
+                options={"style": "ring"},
+            )
+        )
+
+    def make_entity_icon(slot: int) -> EntityWidget:
+        return EntityWidget(
+            WidgetConfig(
+                widget_type="entity",
+                slot=slot,
+                entity_id="sensor.temp",
+                label="Temperature",
+                color=COLOR_ORANGE,
+                options={"icon": "temp"},
+            )
+        )
+
+    def make_entity_plain(slot: int) -> EntityWidget:
+        return EntityWidget(
+            WidgetConfig(
+                widget_type="entity",
+                slot=slot,
+                entity_id="sensor.temp",
+                label="Temperature",
+                color=COLOR_CYAN,
+                options={},
+            )
+        )
+
+    # Widget configs: (name, factory)
+    widget_types = [
+        ("gauge_bar", make_gauge_bar),
+        ("gauge_ring", make_gauge_ring),
+        ("entity_icon", make_entity_icon),
+        ("entity_plain", make_entity_plain),
+    ]
+
+    # Layout configs: (suffix, layout_class, num_slots, padding, gap)
+    layouts = [
+        ("1x1", None, 1, 8, 8),  # Single widget (use SplitLayout with ratio=1)
+        ("1x2", SplitLayout, 2, 8, 8),  # 2 horizontal
+        ("2x1", None, 2, 8, 8),  # 2 vertical (SplitLayout horizontal=True)
+        ("2x2", Grid2x2, 4, 8, 8),
+        ("2x3", Grid2x3, 6, 8, 8),
+        ("3x3", Grid3x3, 9, 6, 6),
+    ]
+
+    for widget_name, make_widget in widget_types:
+        for layout_suffix, layout_class, num_slots, padding, gap in layouts:
+            img, draw = renderer.create_canvas()
+
+            if layout_suffix == "1x1":
+                # Single widget using hero layout with minimal footer
+                layout = HeroLayout(footer_slots=1, hero_ratio=1.0, padding=padding, gap=gap)
+                layout.set_widget(0, make_widget(0))
+            elif layout_suffix == "1x2":
+                # 2 side-by-side
+                layout = SplitLayout(horizontal=False, ratio=0.5, padding=padding, gap=gap)
+                for i in range(2):
+                    layout.set_widget(i, make_widget(i))
+            elif layout_suffix == "2x1":
+                # 2 stacked vertically
+                layout = SplitLayout(horizontal=True, ratio=0.5, padding=padding, gap=gap)
+                for i in range(2):
+                    layout.set_widget(i, make_widget(i))
+            else:
+                assert layout_class is not None
+                layout = layout_class(padding=padding, gap=gap)
+                for i in range(num_slots):
+                    layout.set_widget(i, make_widget(i))
+
+            layout.render(renderer, draw, hass)  # type: ignore[arg-type]
+            save_image(renderer, img, f"{widget_name}_{layout_suffix}", widgets_dir)
+
+    print(f"Generated widget size samples in {widgets_dir}")
+
+
 def generate_system_monitor(renderer: Renderer, output_dir: Path) -> None:
     """Generate system monitor dashboard using Grid2x2 layout with GaugeWidgets."""
     hass = MockHass()
@@ -982,9 +1091,10 @@ def main() -> None:
     generate_security(renderer, output_dir)
     generate_gauge_sizes_2x2(renderer, output_dir)
     generate_gauge_sizes_2x3(renderer, output_dir)
+    generate_widget_sizes(renderer, output_dir)
 
     print()
-    print(f"Done! Generated 15 sample images in {output_dir}")
+    print(f"Done! Generated samples in {output_dir}")
 
 
 if __name__ == "__main__":
