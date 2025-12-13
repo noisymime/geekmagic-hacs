@@ -59,11 +59,17 @@ A Home Assistant custom integration for GeekMagic displays (SmallTV Pro and simi
 
 ### Initial Setup
 
-After adding the integration, your device will display a welcome screen until you configure a dashboard:
+After adding the integration, your device will display a welcome screen with live data until you configure a dashboard:
 
 <p align="center">
   <img src="samples/00_welcome_screen.png" alt="Welcome Screen" width="180">
 </p>
+
+The welcome screen shows:
+- **Current time and date** - Updates every refresh interval
+- **Home Assistant version** - Your HA instance version
+- **Entity count** - Total entities in your system
+- **Configure hint** - Reminder to set up your dashboard
 
 Go to the integration options to add screens and widgets. Changes are applied immediately to the device.
 

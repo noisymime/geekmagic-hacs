@@ -808,9 +808,78 @@ def generate_security(renderer: Renderer, output_dir: Path) -> None:
 
 
 def generate_welcome_screen(renderer: Renderer, output_dir: Path) -> None:
-    """Generate welcome screen shown when device has no configuration."""
+    """Generate welcome screen shown when device has no configuration.
+
+    This mimics the dynamic welcome layout with clock, HA version, and entity count.
+    """
+    from custom_components.geekmagic.layouts.hero import HeroLayout
+    from custom_components.geekmagic.widgets.clock import ClockWidget
+    from custom_components.geekmagic.widgets.text import TextWidget
+
+    hass = MockHass()
+
+    layout = HeroLayout(footer_slots=3, hero_ratio=0.65, padding=8, gap=8)
     img, draw = renderer.create_canvas()
-    renderer.draw_welcome_screen(draw)
+
+    # Hero: Clock widget showing current time
+    clock = ClockWidget(
+        WidgetConfig(
+            widget_type="clock",
+            slot=0,
+            color=COLOR_WHITE,
+            options={"show_date": True, "show_seconds": False},
+        )
+    )
+    layout.set_widget(0, clock)
+
+    # Footer slot 1: HA version
+    ha_version = TextWidget(
+        WidgetConfig(
+            widget_type="text",
+            slot=1,
+            label="HA",
+            color=COLOR_CYAN,
+            options={
+                "text": "2024.12.1",
+                "size": "small",
+                "align": "center",
+            },
+        )
+    )
+    layout.set_widget(1, ha_version)
+
+    # Footer slot 2: Entity count
+    entity_count = TextWidget(
+        WidgetConfig(
+            widget_type="text",
+            slot=2,
+            label="Entities",
+            color=COLOR_LIME,
+            options={
+                "text": "247",
+                "size": "small",
+                "align": "center",
+            },
+        )
+    )
+    layout.set_widget(2, entity_count)
+
+    # Footer slot 3: Setup hint
+    setup_hint = TextWidget(
+        WidgetConfig(
+            widget_type="text",
+            slot=3,
+            color=COLOR_GRAY,
+            options={
+                "text": "Configure →",
+                "size": "small",
+                "align": "center",
+            },
+        )
+    )
+    layout.set_widget(3, setup_hint)
+
+    layout.render(renderer, draw, hass)  # type: ignore[arg-type]
     save_image(renderer, img, "00_welcome_screen", output_dir)
 
 

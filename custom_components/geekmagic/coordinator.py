@@ -5,12 +5,17 @@ from __future__ import annotations
 import logging
 import time
 from datetime import timedelta
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
+from homeassistant.const import __version__ as ha_version
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
+    COLOR_CYAN,
+    COLOR_GRAY,
+    COLOR_LIME,
+    COLOR_WHITE,
     CONF_LAYOUT,
     CONF_REFRESH_INTERVAL,
     CONF_SCREEN_CYCLE_INTERVAL,
@@ -40,6 +45,9 @@ from .widgets.progress import MultiProgressWidget, ProgressWidget
 from .widgets.status import StatusListWidget, StatusWidget
 from .widgets.text import TextWidget
 from .widgets.weather import WeatherWidget
+
+if TYPE_CHECKING:
+    from .layouts.base import Layout
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -109,6 +117,9 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         # Initialize screens
         self._setup_screens()
 
+        # Create welcome layout for when no screens are configured
+        self._welcome_layout: Layout | None = None
+
     def _migrate_options(self, options: dict[str, Any]) -> dict[str, Any]:
         """Migrate old single-screen options to new multi-screen format.
 
@@ -160,6 +171,85 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
                 self._current_screen,
             )
             self._current_screen = 0
+
+    def _create_welcome_layout(self) -> Layout:
+        """Create a welcome layout showcasing widgets with HA info.
+
+        Returns:
+            A HeroLayout with clock, HA version, and entity stats.
+        """
+        layout = HeroLayout(footer_slots=3, hero_ratio=0.65, padding=8, gap=8)
+
+        # Hero: Clock widget showing current time
+        clock = ClockWidget(
+            WidgetConfig(
+                widget_type="clock",
+                slot=0,
+                color=COLOR_WHITE,
+                options={"show_date": True, "show_seconds": False},
+            )
+        )
+        layout.set_widget(0, clock)
+
+        # Footer slot 1: HA version
+        ha_version = TextWidget(
+            WidgetConfig(
+                widget_type="text",
+                slot=1,
+                label="HA",
+                color=COLOR_CYAN,
+                options={
+                    "text": self._get_ha_version(),
+                    "size": "small",
+                    "align": "center",
+                },
+            )
+        )
+        layout.set_widget(1, ha_version)
+
+        # Footer slot 2: Entity count
+        entity_count = TextWidget(
+            WidgetConfig(
+                widget_type="text",
+                slot=2,
+                label="Entities",
+                color=COLOR_LIME,
+                options={
+                    "text": str(self._get_entity_count()),
+                    "size": "small",
+                    "align": "center",
+                },
+            )
+        )
+        layout.set_widget(2, entity_count)
+
+        # Footer slot 3: Setup hint
+        setup_hint = TextWidget(
+            WidgetConfig(
+                widget_type="text",
+                slot=3,
+                color=COLOR_GRAY,
+                options={
+                    "text": "Configure →",
+                    "size": "small",
+                    "align": "center",
+                },
+            )
+        )
+        layout.set_widget(3, setup_hint)
+
+        return layout
+
+    def _get_ha_version(self) -> str:
+        """Get Home Assistant version string."""
+        return ha_version
+
+    def _get_entity_count(self) -> int:
+        """Get total number of entities in Home Assistant."""
+        try:
+            return len(self.hass.states.async_all())
+        except Exception:
+            return 0
 
     def _create_layout(self, screen_config: dict[str, Any]):
         """Create a layout from screen configuration.
@@ -290,9 +380,11 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
             )
             layout.render(self.renderer, draw, self.hass)
         else:
-            # No screens configured - show welcome screen
+            # No screens configured - show welcome screen with live data
             _LOGGER.debug("No screens configured, rendering welcome screen")
-            self.renderer.draw_welcome_screen(draw)
+            # Recreate welcome layout each time to get fresh HA stats
+            welcome_layout = self._create_welcome_layout()
+            welcome_layout.render(self.renderer, draw, self.hass)
 
         # Encode to both formats
         jpeg_data = self.renderer.to_jpeg(img)
