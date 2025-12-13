@@ -25,6 +25,7 @@ from custom_components.geekmagic.const import (
     COLOR_RED,
     COLOR_TEAL,
     COLOR_WHITE,
+    COLOR_YELLOW,
 )
 from custom_components.geekmagic.layouts.grid import Grid2x2, Grid2x3
 from custom_components.geekmagic.layouts.hero import HeroLayout
@@ -69,6 +70,12 @@ def save_image(renderer: Renderer, img: Image.Image, name: str, output_dir: Path
 def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
     """Generate full 240x240 layouts showing each widget type in different grid sizes."""
     from custom_components.geekmagic.layouts.grid import Grid3x3
+    from custom_components.geekmagic.widgets.chart import ChartWidget
+    from custom_components.geekmagic.widgets.clock import ClockWidget
+    from custom_components.geekmagic.widgets.progress import ProgressWidget
+    from custom_components.geekmagic.widgets.status import StatusWidget
+    from custom_components.geekmagic.widgets.text import TextWidget
+    from custom_components.geekmagic.widgets.weather import WeatherWidget
 
     widgets_dir = output_dir / "widgets"
     widgets_dir.mkdir(exist_ok=True)
@@ -77,6 +84,25 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
     hass.states.set("sensor.cpu", "73", {"unit_of_measurement": "%", "friendly_name": "CPU Usage"})
     hass.states.set(
         "sensor.temp", "23.5", {"unit_of_measurement": "°C", "friendly_name": "Temperature"}
+    )
+    hass.states.set(
+        "sensor.steps", "8542", {"unit_of_measurement": "steps", "friendly_name": "Steps"}
+    )
+    hass.states.set("binary_sensor.door", "on", {"friendly_name": "Front Door"})
+    hass.states.set(
+        "weather.home",
+        "sunny",
+        {
+            "friendly_name": "Weather",
+            "temperature": 24,
+            "temperature_unit": "°C",
+            "humidity": 45,
+            "forecast": [
+                {"datetime": "2024-01-15", "condition": "sunny", "temperature": 26},
+                {"datetime": "2024-01-16", "condition": "cloudy", "temperature": 23},
+                {"datetime": "2024-01-17", "condition": "rainy", "temperature": 19},
+            ],
+        },
     )
 
     def make_gauge_bar(slot: int) -> GaugeWidget:
@@ -100,6 +126,18 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
                 label="CPU",
                 color=COLOR_LIME,
                 options={"style": "ring"},
+            )
+        )
+
+    def make_gauge_arc(slot: int) -> GaugeWidget:
+        return GaugeWidget(
+            WidgetConfig(
+                widget_type="gauge",
+                slot=slot,
+                entity_id="sensor.temp",
+                label="Temp",
+                color=COLOR_ORANGE,
+                options={"style": "arc"},
             )
         )
 
@@ -127,12 +165,89 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
             )
         )
 
+    def make_clock(slot: int) -> ClockWidget:
+        return ClockWidget(
+            WidgetConfig(
+                widget_type="clock",
+                slot=slot,
+                color=COLOR_WHITE,
+                options={"show_date": True, "time_format": "24h"},
+            )
+        )
+
+    def make_text(slot: int) -> TextWidget:
+        return TextWidget(
+            WidgetConfig(
+                widget_type="text",
+                slot=slot,
+                color=COLOR_CYAN,
+                options={"text": "Hello"},
+            )
+        )
+
+    def make_progress(slot: int) -> ProgressWidget:
+        return ProgressWidget(
+            WidgetConfig(
+                widget_type="progress",
+                slot=slot,
+                entity_id="sensor.steps",
+                label="Steps",
+                color=COLOR_LIME,
+                options={"target": 10000, "icon": "heart"},
+            )
+        )
+
+    def make_weather(slot: int) -> WeatherWidget:
+        return WeatherWidget(
+            WidgetConfig(
+                widget_type="weather",
+                slot=slot,
+                entity_id="weather.home",
+                color=COLOR_YELLOW,
+                options={"show_forecast": True, "forecast_days": 3},
+            )
+        )
+
+    def make_status(slot: int) -> StatusWidget:
+        return StatusWidget(
+            WidgetConfig(
+                widget_type="status",
+                slot=slot,
+                entity_id="binary_sensor.door",
+                label="Door",
+                color=COLOR_LIME,
+                options={"icon": "lock"},
+            )
+        )
+
+    def make_chart(slot: int) -> ChartWidget:
+        widget = ChartWidget(
+            WidgetConfig(
+                widget_type="chart",
+                slot=slot,
+                entity_id="sensor.temp",
+                label="Temperature",
+                color=COLOR_CYAN,
+                options={},
+            )
+        )
+        # Set mock history data
+        widget.set_history([20, 21, 22, 21, 23, 24, 23, 22, 21, 22, 23, 24])
+        return widget
+
     # Widget configs: (name, factory)
     widget_types = [
         ("gauge_bar", make_gauge_bar),
         ("gauge_ring", make_gauge_ring),
+        ("gauge_arc", make_gauge_arc),
         ("entity_icon", make_entity_icon),
         ("entity_plain", make_entity_plain),
+        ("clock", make_clock),
+        ("text", make_text),
+        ("progress", make_progress),
+        ("weather", make_weather),
+        ("status", make_status),
+        ("chart", make_chart),
     ]
 
     # Layout configs: (suffix, layout_class, num_slots, padding, gap)

@@ -298,39 +298,31 @@ Widgets automatically adapt their layout based on cell size:
 |--------|-----|-----|-----|-----|-----|-----|
 | **Gauge (Bar)** | <img src="samples/widgets/gauge_bar_1x1.png" width="60"> | <img src="samples/widgets/gauge_bar_1x2.png" width="60"> | <img src="samples/widgets/gauge_bar_2x1.png" width="60"> | <img src="samples/widgets/gauge_bar_2x2.png" width="60"> | <img src="samples/widgets/gauge_bar_2x3.png" width="60"> | <img src="samples/widgets/gauge_bar_3x3.png" width="60"> |
 | **Gauge (Ring)** | <img src="samples/widgets/gauge_ring_1x1.png" width="60"> | <img src="samples/widgets/gauge_ring_1x2.png" width="60"> | <img src="samples/widgets/gauge_ring_2x1.png" width="60"> | <img src="samples/widgets/gauge_ring_2x2.png" width="60"> | <img src="samples/widgets/gauge_ring_2x3.png" width="60"> | <img src="samples/widgets/gauge_ring_3x3.png" width="60"> |
+| **Gauge (Arc)** | <img src="samples/widgets/gauge_arc_1x1.png" width="60"> | <img src="samples/widgets/gauge_arc_1x2.png" width="60"> | <img src="samples/widgets/gauge_arc_2x1.png" width="60"> | <img src="samples/widgets/gauge_arc_2x2.png" width="60"> | <img src="samples/widgets/gauge_arc_2x3.png" width="60"> | <img src="samples/widgets/gauge_arc_3x3.png" width="60"> |
 | **Entity (Icon)** | <img src="samples/widgets/entity_icon_1x1.png" width="60"> | <img src="samples/widgets/entity_icon_1x2.png" width="60"> | <img src="samples/widgets/entity_icon_2x1.png" width="60"> | <img src="samples/widgets/entity_icon_2x2.png" width="60"> | <img src="samples/widgets/entity_icon_2x3.png" width="60"> | <img src="samples/widgets/entity_icon_3x3.png" width="60"> |
 | **Entity (Plain)** | <img src="samples/widgets/entity_plain_1x1.png" width="60"> | <img src="samples/widgets/entity_plain_1x2.png" width="60"> | <img src="samples/widgets/entity_plain_2x1.png" width="60"> | <img src="samples/widgets/entity_plain_2x2.png" width="60"> | <img src="samples/widgets/entity_plain_2x3.png" width="60"> | <img src="samples/widgets/entity_plain_3x3.png" width="60"> |
-
-### Other Widgets
-
-<p>
-<img src="samples/widgets/widget_clock.png" width="100" title="Clock">
-<img src="samples/widgets/widget_media.png" width="100" title="Media">
-<img src="samples/widgets/widget_chart.png" width="100" title="Chart">
-<img src="samples/widgets/widget_text.png" width="100" title="Text">
-<img src="samples/widgets/widget_gauge_arc.png" width="100" title="Gauge Arc">
-<img src="samples/widgets/widget_progress.png" width="100" title="Progress">
-<img src="samples/widgets/widget_multi_progress.png" width="100" title="Multi-Progress">
-<img src="samples/widgets/widget_weather.png" width="100" title="Weather">
-<img src="samples/widgets/widget_status.png" width="100" title="Status">
-<img src="samples/widgets/widget_status_list.png" width="100" title="Status List">
-</p>
+| **Clock** | <img src="samples/widgets/clock_1x1.png" width="60"> | <img src="samples/widgets/clock_1x2.png" width="60"> | <img src="samples/widgets/clock_2x1.png" width="60"> | <img src="samples/widgets/clock_2x2.png" width="60"> | <img src="samples/widgets/clock_2x3.png" width="60"> | <img src="samples/widgets/clock_3x3.png" width="60"> |
+| **Text** | <img src="samples/widgets/text_1x1.png" width="60"> | <img src="samples/widgets/text_1x2.png" width="60"> | <img src="samples/widgets/text_2x1.png" width="60"> | <img src="samples/widgets/text_2x2.png" width="60"> | <img src="samples/widgets/text_2x3.png" width="60"> | <img src="samples/widgets/text_3x3.png" width="60"> |
+| **Progress** | <img src="samples/widgets/progress_1x1.png" width="60"> | <img src="samples/widgets/progress_1x2.png" width="60"> | <img src="samples/widgets/progress_2x1.png" width="60"> | <img src="samples/widgets/progress_2x2.png" width="60"> | <img src="samples/widgets/progress_2x3.png" width="60"> | <img src="samples/widgets/progress_3x3.png" width="60"> |
+| **Weather** | <img src="samples/widgets/weather_1x1.png" width="60"> | <img src="samples/widgets/weather_1x2.png" width="60"> | <img src="samples/widgets/weather_2x1.png" width="60"> | <img src="samples/widgets/weather_2x2.png" width="60"> | <img src="samples/widgets/weather_2x3.png" width="60"> | <img src="samples/widgets/weather_3x3.png" width="60"> |
+| **Status** | <img src="samples/widgets/status_1x1.png" width="60"> | <img src="samples/widgets/status_1x2.png" width="60"> | <img src="samples/widgets/status_2x1.png" width="60"> | <img src="samples/widgets/status_2x2.png" width="60"> | <img src="samples/widgets/status_2x3.png" width="60"> | <img src="samples/widgets/status_3x3.png" width="60"> |
+| **Chart** | <img src="samples/widgets/chart_1x1.png" width="60"> | <img src="samples/widgets/chart_1x2.png" width="60"> | <img src="samples/widgets/chart_2x1.png" width="60"> | <img src="samples/widgets/chart_2x2.png" width="60"> | <img src="samples/widgets/chart_2x3.png" width="60"> | <img src="samples/widgets/chart_3x3.png" width="60"> |
 
 ### Widget Types
 
 | Type | Description |
 |------|-------------|
-| `camera` | Camera snapshot display |
-| `clock` | Time and date |
-| `entity` | Any HA entity value (with optional icon) |
-| `media` | Now playing from media player |
-| `chart` | Sparkline from entity history |
-| `text` | Static or dynamic text |
 | `gauge` | Bar, ring, or arc gauge (`style: bar/ring/arc`) |
+| `entity` | Any HA entity value (with optional `icon`) |
+| `clock` | Time and date |
+| `text` | Static or dynamic text |
 | `progress` | Goal tracking with progress bar |
-| `multi_progress` | Multiple progress items |
 | `weather` | Weather with forecast |
 | `status` | Binary sensor indicator |
+| `chart` | Sparkline from entity history |
+| `camera` | Camera snapshot display |
+| `media` | Now playing from media player |
+| `multi_progress` | Multiple progress items |
 | `status_list` | Multiple status indicators |
 
 ---
