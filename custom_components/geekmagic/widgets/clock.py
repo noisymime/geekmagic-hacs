@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from ..const import COLOR_WHITE, COLOR_GRAY, COLOR_CYAN
+from ..const import COLOR_GRAY, COLOR_WHITE
 from .base import Widget, WidgetConfig
 
 if TYPE_CHECKING:
-    from PIL import ImageDraw
     from homeassistant.core import HomeAssistant
+    from PIL import ImageDraw
 
     from ..renderer import Renderer
 
@@ -50,7 +50,11 @@ class ClockWidget(Widget):
         center_x = x1 + width // 2
         center_y = y1 + height // 2
 
-        now = datetime.now()
+        # Get timezone from Home Assistant if available, otherwise use UTC
+        tz = None
+        if hass is not None:
+            tz = getattr(hass.config, "time_zone_obj", None) or UTC
+        now = datetime.now(tz=tz or UTC)
 
         # Format time
         if self.show_seconds:
@@ -60,13 +64,12 @@ class ClockWidget(Widget):
             else:
                 time_str = now.strftime("%H:%M:%S")
                 ampm = None
+        elif self.time_format == "12h":
+            time_str = now.strftime("%I:%M")
+            ampm = now.strftime("%p")
         else:
-            if self.time_format == "12h":
-                time_str = now.strftime("%I:%M")
-                ampm = now.strftime("%p")
-            else:
-                time_str = now.strftime("%H:%M")
-                ampm = None
+            time_str = now.strftime("%H:%M")
+            ampm = None
 
         # Calculate positions
         time_y = center_y - 10 if self.show_date else center_y

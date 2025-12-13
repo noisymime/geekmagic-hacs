@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING
 
-from ..const import COLOR_WHITE, COLOR_GRAY, COLOR_CYAN
+from ..const import COLOR_CYAN, COLOR_GRAY
 from .base import Widget, WidgetConfig
 
 if TYPE_CHECKING:
-    from PIL import ImageDraw
     from homeassistant.core import HomeAssistant
+    from PIL import ImageDraw
 
     from ..renderer import Renderer
 
@@ -52,7 +53,6 @@ class ChartWidget(Widget):
         """
         x1, y1, x2, y2 = rect
         width = x2 - x1
-        height = y2 - y1
         padding = 10
 
         # Get current value from entity
@@ -62,10 +62,8 @@ class ChartWidget(Widget):
         name = self.config.label or "Chart"
 
         if state is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 current_value = float(state.state)
-            except (ValueError, TypeError):
-                pass
             unit = state.attributes.get("unit_of_measurement", "")
             name = self.config.label or state.attributes.get("friendly_name", "Chart")
 

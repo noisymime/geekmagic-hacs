@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any
 
 import aiohttp
 
@@ -194,7 +192,8 @@ class GeekMagicDevice:
         """
         try:
             await self.get_state()
-            return True
         except Exception as e:
             _LOGGER.debug("Connection test failed: %s", e)
             return False
+        else:
+            return True
