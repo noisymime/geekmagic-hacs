@@ -946,7 +946,7 @@ let g = class extends M {
     var r;
     if (!this._config) return d;
     const e = (r = this._editingView) == null ? void 0 : r.widgets.find((n) => n.slot === s), t = (e == null ? void 0 : e.type) || "", i = this._config.widget_types[t];
-    return p`
+    return console.log(`Slot ${s}: type="${t}", schema=`, i, "needs_entity=", i == null ? void 0 : i.needs_entity), p`
       <ha-card class="slot-card">
         <div class="card-content">
           <div class="slot-header">Slot ${s + 1}</div>
@@ -956,8 +956,8 @@ let g = class extends M {
               label="Widget Type"
               .value=${t}
               @selected=${(n) => {
-      const o = n.detail.index, a = ["", ...Object.keys(this._config.widget_types)][o] || "";
-      this._updateWidget(s, { type: a });
+      const o = n.detail.index, c = ["", ...Object.keys(this._config.widget_types)], a = c[o] || "";
+      console.log(`Widget select: index=${o}, keys=`, c, `value="${a}"`), this._updateWidget(s, { type: a });
     }}
               @closed=${(n) => n.stopPropagation()}
             >
