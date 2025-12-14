@@ -665,9 +665,9 @@ export class GeekMagicPanel extends LitElement {
             <ha-select
               label="Layout"
               .value=${this._editingView.layout}
-              @selected=${(e: CustomEvent) => {
-                const select = e.target as HTMLElement & { value: string };
-                this._updateEditingView({ layout: select.value });
+              @change=${(e: Event) => {
+                const value = (e.target as any).value;
+                this._updateEditingView({ layout: value });
               }}
               @closed=${(e: Event) => e.stopPropagation()}
             >
@@ -682,9 +682,9 @@ export class GeekMagicPanel extends LitElement {
             <ha-select
               label="Theme"
               .value=${this._editingView.theme}
-              @selected=${(e: CustomEvent) => {
-                const select = e.target as HTMLElement & { value: string };
-                this._updateEditingView({ theme: select.value });
+              @change=${(e: Event) => {
+                const value = (e.target as any).value;
+                this._updateEditingView({ theme: value });
               }}
               @closed=${(e: Event) => e.stopPropagation()}
             >
@@ -748,9 +748,9 @@ export class GeekMagicPanel extends LitElement {
             <ha-select
               label="Widget Type"
               .value=${widgetType}
-              @selected=${(e: CustomEvent) => {
-                const select = e.target as HTMLElement & { value: string };
-                this._updateWidget(slot, { type: select.value });
+              @change=${(e: Event) => {
+                const value = (e.target as any).value;
+                this._updateWidget(slot, { type: value });
               }}
               @closed=${(e: Event) => e.stopPropagation()}
             >

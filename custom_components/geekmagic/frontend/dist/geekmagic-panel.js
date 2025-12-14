@@ -879,9 +879,9 @@ let g = class extends M {
             <ha-select
               label="Layout"
               .value=${this._editingView.layout}
-              @selected=${(t) => {
-      const i = t.target;
-      this._updateEditingView({ layout: i.value });
+              @change=${(t) => {
+      const i = t.target.value;
+      this._updateEditingView({ layout: i });
     }}
               @closed=${(t) => t.stopPropagation()}
             >
@@ -896,9 +896,9 @@ let g = class extends M {
             <ha-select
               label="Theme"
               .value=${this._editingView.theme}
-              @selected=${(t) => {
-      const i = t.target;
-      this._updateEditingView({ theme: i.value });
+              @change=${(t) => {
+      const i = t.target.value;
+      this._updateEditingView({ theme: i });
     }}
               @closed=${(t) => t.stopPropagation()}
             >
@@ -955,9 +955,9 @@ let g = class extends M {
             <ha-select
               label="Widget Type"
               .value=${t}
-              @selected=${(n) => {
-      const o = n.target;
-      this._updateWidget(s, { type: o.value });
+              @change=${(n) => {
+      const o = n.target.value;
+      this._updateWidget(s, { type: o });
     }}
               @closed=${(n) => n.stopPropagation()}
             >
