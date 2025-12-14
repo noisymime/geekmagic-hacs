@@ -717,6 +717,7 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
                     False,  # significant_changes_only
                     True,  # minimal_response
                     True,  # no_attributes
+                    False,  # compressed_state_format - False to get State objects
                 )
 
                 if history and entity_id in history:
