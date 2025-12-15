@@ -236,6 +236,7 @@ class Renderer:
         source: Image.Image,
         rect: tuple[int, int, int, int],
         preserve_aspect: bool = True,
+        fit_mode: str | None = None,
     ) -> None:
         """Draw/paste an image onto the canvas.
 
@@ -243,7 +244,9 @@ class Renderer:
             draw: ImageDraw instance (used to get underlying image)
             source: Source PIL Image to paste
             rect: (x1, y1, x2, y2) destination rectangle (will be scaled)
-            preserve_aspect: If True, preserve aspect ratio and center
+            preserve_aspect: If True, preserve aspect ratio and center (legacy param)
+            fit_mode: "contain" (letterbox), "cover" (crop), or "stretch".
+                      If specified, overrides preserve_aspect.
         """
         # Get the underlying image from the draw object
         canvas = draw._image  # noqa: SLF001
@@ -253,11 +256,15 @@ class Renderer:
         dest_width = x2 - x1
         dest_height = y2 - y1
 
-        if preserve_aspect:
-            # Calculate size preserving aspect ratio
-            src_ratio = source.width / source.height
-            dest_ratio = dest_width / dest_height
+        # Determine fit mode
+        if fit_mode is None:
+            fit_mode = "contain" if preserve_aspect else "stretch"
 
+        src_ratio = source.width / source.height
+        dest_ratio = dest_width / dest_height
+
+        if fit_mode == "contain":
+            # Fit inside destination, preserving aspect ratio (may letterbox)
             if src_ratio > dest_ratio:
                 # Source is wider - fit to width
                 new_width = dest_width
@@ -274,8 +281,30 @@ class Renderer:
             # Resize and paste
             resized = source.resize((new_width, new_height), Image.Resampling.LANCZOS)
             canvas.paste(resized, (x1 + offset_x, y1 + offset_y))
-        else:
-            # Stretch to fill
+
+        elif fit_mode == "cover":
+            # Fill destination, cropping excess (no distortion)
+            if src_ratio > dest_ratio:
+                # Source is wider - fit to height, crop width
+                new_height = dest_height
+                new_width = int(dest_height * src_ratio)
+            else:
+                # Source is taller - fit to width, crop height
+                new_width = dest_width
+                new_height = int(dest_width / src_ratio)
+
+            # Resize first
+            resized = source.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+            # Crop to center
+            crop_x = (new_width - dest_width) // 2
+            crop_y = (new_height - dest_height) // 2
+            cropped = resized.crop((crop_x, crop_y, crop_x + dest_width, crop_y + dest_height))
+
+            canvas.paste(cropped, (x1, y1))
+
+        else:  # stretch
+            # Stretch to fill (may distort)
             resized = source.resize((dest_width, dest_height), Image.Resampling.LANCZOS)
             canvas.paste(resized, (x1, y1))
 

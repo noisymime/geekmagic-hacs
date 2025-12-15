@@ -63,8 +63,7 @@ class CameraWidget(Widget):
             label_y = None
 
         # Draw the camera image
-        preserve_aspect = self.fit == "contain"
-        ctx.draw_image(camera_image, rect=image_rect, preserve_aspect=preserve_aspect)
+        ctx.draw_image(camera_image, rect=image_rect, fit_mode=self.fit)
 
         # Draw label if enabled
         if self.show_label and label_y is not None:

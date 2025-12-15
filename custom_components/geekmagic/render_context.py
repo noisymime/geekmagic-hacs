@@ -447,6 +447,7 @@ class RenderContext:
         source: Image.Image,  # type: ignore[name-defined]
         rect: tuple[int, int, int, int] | None = None,
         preserve_aspect: bool = True,
+        fit_mode: str | None = None,
     ) -> None:
         """Draw/paste an image in local coordinates.
 
@@ -454,12 +455,16 @@ class RenderContext:
             source: PIL Image to paste
             rect: (x1, y1, x2, y2) destination in local coordinates.
                   If None, fills the entire widget area.
-            preserve_aspect: If True, preserve aspect ratio and center
+            preserve_aspect: If True, preserve aspect ratio and center (legacy)
+            fit_mode: "contain" (letterbox), "cover" (crop), or "stretch".
+                      If specified, overrides preserve_aspect.
         """
         if rect is None:
             rect = (0, 0, self.width, self.height)
         abs_rect = self._abs_rect(rect)
-        self._renderer.draw_image(self._draw, source, abs_rect, preserve_aspect=preserve_aspect)
+        self._renderer.draw_image(
+            self._draw, source, abs_rect, preserve_aspect=preserve_aspect, fit_mode=fit_mode
+        )
 
     # =========================================================================
     # Color Utilities
