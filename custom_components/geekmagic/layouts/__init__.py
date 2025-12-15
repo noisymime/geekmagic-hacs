@@ -1,8 +1,10 @@
 """Layout systems for GeekMagic displays."""
 
 from .base import Layout
+from .corner_hero import HeroCornerBL, HeroCornerBR, HeroCornerTL, HeroCornerTR
 from .grid import GridLayout
 from .hero import HeroLayout
+from .sidebar import SidebarLeft, SidebarRight
 from .split import (
     SplitHorizontal,
     SplitHorizontal1To2,
@@ -15,8 +17,14 @@ from .split import (
 
 __all__ = [
     "GridLayout",
+    "HeroCornerBL",
+    "HeroCornerBR",
+    "HeroCornerTL",
+    "HeroCornerTR",
     "HeroLayout",
     "Layout",
+    "SidebarLeft",
+    "SidebarRight",
     "SplitHorizontal",
     "SplitHorizontal1To2",
     "SplitHorizontal2To1",

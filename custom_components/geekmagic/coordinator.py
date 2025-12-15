@@ -31,6 +31,12 @@ from .const import (
     LAYOUT_GRID_3X2,
     LAYOUT_GRID_3X3,
     LAYOUT_HERO,
+    LAYOUT_HERO_BL,
+    LAYOUT_HERO_BR,
+    LAYOUT_HERO_TL,
+    LAYOUT_HERO_TR,
+    LAYOUT_SIDEBAR_LEFT,
+    LAYOUT_SIDEBAR_RIGHT,
     LAYOUT_SPLIT_H,
     LAYOUT_SPLIT_H_1_2,
     LAYOUT_SPLIT_H_2_1,
@@ -40,8 +46,10 @@ from .const import (
     THEME_CLASSIC,
 )
 from .device import DeviceState, GeekMagicDevice, SpaceInfo
+from .layouts.corner_hero import HeroCornerBL, HeroCornerBR, HeroCornerTL, HeroCornerTR
 from .layouts.grid import Grid2x2, Grid2x3, Grid3x2, Grid3x3
 from .layouts.hero import HeroLayout
+from .layouts.sidebar import SidebarLeft, SidebarRight
 from .layouts.split import (
     SplitHorizontal,
     SplitHorizontal1To2,
@@ -85,6 +93,12 @@ LAYOUT_CLASSES = {
     LAYOUT_SPLIT_V: SplitVertical,
     LAYOUT_THREE_COLUMN: ThreeColumnLayout,
     LAYOUT_THREE_ROW: ThreeRowLayout,
+    LAYOUT_SIDEBAR_LEFT: SidebarLeft,
+    LAYOUT_SIDEBAR_RIGHT: SidebarRight,
+    LAYOUT_HERO_TL: HeroCornerTL,
+    LAYOUT_HERO_TR: HeroCornerTR,
+    LAYOUT_HERO_BL: HeroCornerBL,
+    LAYOUT_HERO_BR: HeroCornerBR,
 }
 
 WIDGET_CLASSES = {

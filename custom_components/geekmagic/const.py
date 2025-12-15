@@ -64,6 +64,12 @@ LAYOUT_THREE_COLUMN = "three_column"
 LAYOUT_THREE_ROW = "three_row"
 LAYOUT_SPLIT_H_1_2 = "split_h_1_2"  # Narrow left (1/3), wide right (2/3)
 LAYOUT_SPLIT_H_2_1 = "split_h_2_1"  # Wide left (2/3), narrow right (1/3)
+LAYOUT_SIDEBAR_LEFT = "sidebar_left"  # Wide left + 3 right rows
+LAYOUT_SIDEBAR_RIGHT = "sidebar_right"  # 3 left rows + wide right
+LAYOUT_HERO_TL = "hero_corner_tl"  # 2x2 hero top-left
+LAYOUT_HERO_TR = "hero_corner_tr"  # 2x2 hero top-right
+LAYOUT_HERO_BL = "hero_corner_bl"  # 2x2 hero bottom-left
+LAYOUT_HERO_BR = "hero_corner_br"  # 2x2 hero bottom-right
 
 # Widget types
 WIDGET_CAMERA = "camera"
@@ -92,6 +98,12 @@ LAYOUT_SLOT_COUNTS = {
     LAYOUT_THREE_ROW: 3,
     LAYOUT_SPLIT_H_1_2: 2,
     LAYOUT_SPLIT_H_2_1: 2,
+    LAYOUT_SIDEBAR_LEFT: 4,
+    LAYOUT_SIDEBAR_RIGHT: 4,
+    LAYOUT_HERO_TL: 6,
+    LAYOUT_HERO_TR: 6,
+    LAYOUT_HERO_BL: 6,
+    LAYOUT_HERO_BR: 6,
 }
 
 # Widget type display names for UI
