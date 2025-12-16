@@ -60,16 +60,19 @@
     "step": {
       "user": {
         "title": "Add GeekMagic Display",
-        "description": "Enter the IP address of your GeekMagic device.",
+        "description": "Enter the IP address or URL of your GeekMagic device (e.g., 192.168.1.100 or http://192.168.1.100).",
         "data": {
-          "host": "Host (IP address)",
+          "host": "Host (IP address or URL)",
           "name": "Display name"
         }
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to the device. Please check the IP address.",
-      "unknown": "An unexpected error occurred."
+      "timeout": "Connection timed out. The device may be offline or unreachable.",
+      "connection_refused": "Connection refused. Verify the device is powered on and the address is correct.",
+      "dns_error": "Could not resolve hostname. Check the address is correct.",
+      "http_error": "Device responded with an error. It may be running incompatible firmware.",
+      "unknown": "An unexpected error occurred while connecting."
     },
     "abort": {
       "already_configured": "This device is already configured."

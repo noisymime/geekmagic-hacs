@@ -25,6 +25,7 @@ from custom_components.geekmagic.const import (
     DOMAIN,
     LAYOUT_GRID_2X2,
 )
+from custom_components.geekmagic.device import ConnectionResult
 
 
 class TestConfigFlowImports:
@@ -67,7 +68,10 @@ class TestConfigFlowUser:
         ):
             mock_get_session.return_value = AsyncMock()
             mock_device = mock_device_class.return_value
-            mock_device.test_connection = AsyncMock(return_value=False)
+            mock_device.host = "192.168.1.100"
+            mock_device.test_connection = AsyncMock(
+                return_value=ConnectionResult(success=False, error="unknown", message="Test error")
+            )
 
             result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
             result = await hass.config_entries.flow.async_configure(
@@ -76,7 +80,94 @@ class TestConfigFlowUser:
             )
 
             assert result["type"] == FlowResultType.FORM
-            assert result["errors"] == {"base": "cannot_connect"}
+            assert result["errors"] == {"base": "unknown"}
+
+        await hass.async_block_till_done()
+
+    @pytest.mark.asyncio
+    async def test_user_flow_connection_timeout(self, hass):
+        """Test user flow shows timeout error."""
+        with (
+            patch(
+                "custom_components.geekmagic.config_flow.async_get_clientsession"
+            ) as mock_get_session,
+            patch("custom_components.geekmagic.config_flow.GeekMagicDevice") as mock_device_class,
+        ):
+            mock_get_session.return_value = AsyncMock()
+            mock_device = mock_device_class.return_value
+            mock_device.host = "192.168.1.100"
+            mock_device.test_connection = AsyncMock(
+                return_value=ConnectionResult(
+                    success=False, error="timeout", message="Connection timed out"
+                )
+            )
+
+            result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"],
+                user_input={"host": "192.168.1.100", "name": "Test Display"},
+            )
+
+            assert result["type"] == FlowResultType.FORM
+            assert result["errors"] == {"base": "timeout"}
+
+        await hass.async_block_till_done()
+
+    @pytest.mark.asyncio
+    async def test_user_flow_connection_dns_error(self, hass):
+        """Test user flow shows DNS error."""
+        with (
+            patch(
+                "custom_components.geekmagic.config_flow.async_get_clientsession"
+            ) as mock_get_session,
+            patch("custom_components.geekmagic.config_flow.GeekMagicDevice") as mock_device_class,
+        ):
+            mock_get_session.return_value = AsyncMock()
+            mock_device = mock_device_class.return_value
+            mock_device.host = "invalid.hostname"
+            mock_device.test_connection = AsyncMock(
+                return_value=ConnectionResult(
+                    success=False, error="dns_error", message="Could not resolve hostname"
+                )
+            )
+
+            result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"],
+                user_input={"host": "invalid.hostname", "name": "Test Display"},
+            )
+
+            assert result["type"] == FlowResultType.FORM
+            assert result["errors"] == {"base": "dns_error"}
+
+        await hass.async_block_till_done()
+
+    @pytest.mark.asyncio
+    async def test_user_flow_connection_refused(self, hass):
+        """Test user flow shows connection refused error."""
+        with (
+            patch(
+                "custom_components.geekmagic.config_flow.async_get_clientsession"
+            ) as mock_get_session,
+            patch("custom_components.geekmagic.config_flow.GeekMagicDevice") as mock_device_class,
+        ):
+            mock_get_session.return_value = AsyncMock()
+            mock_device = mock_device_class.return_value
+            mock_device.host = "192.168.1.100"
+            mock_device.test_connection = AsyncMock(
+                return_value=ConnectionResult(
+                    success=False, error="connection_refused", message="Connection refused"
+                )
+            )
+
+            result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"],
+                user_input={"host": "192.168.1.100", "name": "Test Display"},
+            )
+
+            assert result["type"] == FlowResultType.FORM
+            assert result["errors"] == {"base": "connection_refused"}
 
         await hass.async_block_till_done()
 
@@ -96,7 +187,8 @@ class TestConfigFlowUser:
         ):
             mock_get_session.return_value = AsyncMock()
             mock_device = mock_device_class.return_value
-            mock_device.test_connection = AsyncMock(return_value=True)
+            mock_device.host = "192.168.1.100"
+            mock_device.test_connection = AsyncMock(return_value=ConnectionResult(success=True))
 
             result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
             result = await hass.config_entries.flow.async_configure(
@@ -112,6 +204,40 @@ class TestConfigFlowUser:
             assert CONF_SCREENS in result["options"]
             assert CONF_REFRESH_INTERVAL in result["options"]
             assert CONF_SCREEN_CYCLE_INTERVAL in result["options"]
+
+        await hass.async_block_till_done()
+
+    @pytest.mark.asyncio
+    async def test_user_flow_success_with_url(self, hass):
+        """Test successful user flow with URL input normalizes the host."""
+        with (
+            patch(
+                "custom_components.geekmagic.config_flow.async_get_clientsession"
+            ) as mock_get_session,
+            patch("custom_components.geekmagic.config_flow.GeekMagicDevice") as mock_device_class,
+            patch(
+                "custom_components.geekmagic.async_setup_entry",
+                return_value=True,
+            ),
+        ):
+            mock_get_session.return_value = AsyncMock()
+            mock_device = mock_device_class.return_value
+            # Simulating what happens when user enters a URL - device.host is normalized
+            mock_device.host = "192.168.1.100"
+            mock_device.test_connection = AsyncMock(return_value=ConnectionResult(success=True))
+
+            result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"],
+                # User enters URL with http://
+                user_input={"host": "http://192.168.1.100", "name": "Test Display"},
+            )
+
+            assert result["type"] == FlowResultType.CREATE_ENTRY
+            # Title uses normalized host from device
+            assert result["title"] == "Test Display"
+            # Data stores original user input
+            assert result["data"]["host"] == "http://192.168.1.100"
 
         await hass.async_block_till_done()
 

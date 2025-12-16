@@ -54,25 +54,26 @@ class GeekMagicConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             host = user_input[CONF_HOST]
             _LOGGER.debug("Config flow: attempting to configure device at %s", host)
 
-            # Check if already configured
-            await self.async_set_unique_id(host)
+            # Check if already configured (use normalized host for uniqueness)
+            session = async_get_clientsession(self.hass)
+            device = GeekMagicDevice(host, session=session)
+            await self.async_set_unique_id(device.host)
             self._abort_if_unique_id_configured()
 
             # Test connection
-            session = async_get_clientsession(self.hass)
-            device = GeekMagicDevice(host, session=session)
+            result = await device.test_connection()
 
-            if await device.test_connection():
+            if result.success:
                 _LOGGER.info("Config flow: successfully connected to %s", host)
 
                 # Create entry with default options
                 return self.async_create_entry(
-                    title=user_input.get(CONF_NAME, f"GeekMagic ({host})"),
+                    title=user_input.get(CONF_NAME, f"GeekMagic ({device.host})"),
                     data=user_input,
                     options=self._get_default_options(),
                 )
-            _LOGGER.warning("Config flow: failed to connect to %s", host)
-            errors["base"] = "cannot_connect"
+            _LOGGER.warning("Config flow: failed to connect to %s: %s", host, result.message)
+            errors["base"] = result.error
 
         return self.async_show_form(
             step_id="user",

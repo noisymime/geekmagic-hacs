@@ -74,6 +74,30 @@ class TestGeekMagicDevice:
         assert device.host == "192.168.1.100"
         assert device.base_url == "http://192.168.1.100"
 
+    def test_init_with_http_url(self):
+        """Test device initialization with http:// URL."""
+        device = GeekMagicDevice("http://192.168.1.100")
+        assert device.host == "192.168.1.100"
+        assert device.base_url == "http://192.168.1.100"
+
+    def test_init_with_https_url(self):
+        """Test device initialization with https:// URL preserves scheme."""
+        device = GeekMagicDevice("https://192.168.1.100")
+        assert device.host == "192.168.1.100"
+        assert device.base_url == "https://192.168.1.100"
+
+    def test_init_with_port(self):
+        """Test device initialization with port number."""
+        device = GeekMagicDevice("http://192.168.1.100:8080")
+        assert device.host == "192.168.1.100:8080"
+        assert device.base_url == "http://192.168.1.100:8080"
+
+    def test_init_with_hostname(self):
+        """Test device initialization with hostname."""
+        device = GeekMagicDevice("geekmagic.local")
+        assert device.host == "geekmagic.local"
+        assert device.base_url == "http://geekmagic.local"
+
     def test_init_with_session(self, mock_session):
         """Test device initialization with provided session."""
         device = GeekMagicDevice("192.168.1.100", session=mock_session)
@@ -203,17 +227,81 @@ class TestGeekMagicDevice:
         device = GeekMagicDevice("192.168.1.100", session=mock_session)
         result = await device.test_connection()
 
-        assert result is True
+        assert result.success is True
+        assert result.error == "none"
+        # ConnectionResult should be truthy when successful
+        assert result
 
     @pytest.mark.asyncio
     async def test_test_connection_failure(self, mock_session, mock_response):
-        """Test connection test fails gracefully."""
+        """Test connection test fails gracefully with generic error."""
         mock_session.get.side_effect = aiohttp.ClientError("Connection refused")
 
         device = GeekMagicDevice("192.168.1.100", session=mock_session)
         result = await device.test_connection()
 
-        assert result is False
+        assert result.success is False
+        # ClientError (base class) maps to unknown
+        assert result.error == "unknown"
+        # ConnectionResult should be falsy when failed
+        assert not result
+
+    @pytest.mark.asyncio
+    async def test_test_connection_timeout(self, mock_session, mock_response):
+        """Test connection test returns timeout error."""
+        mock_session.get.side_effect = TimeoutError()
+
+        device = GeekMagicDevice("192.168.1.100", session=mock_session)
+        result = await device.test_connection()
+
+        assert result.success is False
+        assert result.error == "timeout"
+        assert result.message is not None
+        assert "timed out" in result.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_test_connection_dns_error(self, mock_session, mock_response):
+        """Test connection test returns DNS error."""
+        # Create a DNS error with proper arguments
+        mock_session.get.side_effect = aiohttp.ClientConnectorDNSError(
+            MagicMock(), OSError("DNS lookup failed")
+        )
+
+        device = GeekMagicDevice("invalid.hostname.local", session=mock_session)
+        result = await device.test_connection()
+
+        assert result.success is False
+        assert result.error == "dns_error"
+        assert result.message is not None
+        assert "resolve" in result.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_test_connection_refused(self, mock_session, mock_response):
+        """Test connection test returns connection refused error."""
+        mock_session.get.side_effect = aiohttp.ClientConnectorError(
+            MagicMock(), OSError("Connection refused")
+        )
+
+        device = GeekMagicDevice("192.168.1.100", session=mock_session)
+        result = await device.test_connection()
+
+        assert result.success is False
+        assert result.error == "connection_refused"
+
+    @pytest.mark.asyncio
+    async def test_test_connection_http_error(self, mock_session, mock_response):
+        """Test connection test returns HTTP error."""
+        mock_session.get.side_effect = aiohttp.ClientResponseError(
+            MagicMock(), (), status=500, message="Internal Server Error"
+        )
+
+        device = GeekMagicDevice("192.168.1.100", session=mock_session)
+        result = await device.test_connection()
+
+        assert result.success is False
+        assert result.error == "http_error"
+        assert result.message is not None
+        assert "500" in result.message
 
     @pytest.mark.asyncio
     async def test_close_owned_session(self):

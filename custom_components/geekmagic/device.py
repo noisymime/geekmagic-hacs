@@ -4,12 +4,29 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Literal
+from urllib.parse import urlparse
 
 import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
 
 TIMEOUT = aiohttp.ClientTimeout(total=30)
+
+
+@dataclass
+class ConnectionResult:
+    """Result of a connection test."""
+
+    success: bool
+    error: Literal[
+        "none", "timeout", "connection_refused", "dns_error", "http_error", "unknown"
+    ] = "none"
+    message: str | None = None
+
+    def __bool__(self) -> bool:
+        """Allow using ConnectionResult in boolean context."""
+        return self.success
 
 
 @dataclass
@@ -36,11 +53,17 @@ class GeekMagicDevice:
         """Initialize the device client.
 
         Args:
-            host: IP address or hostname of the device
+            host: IP address, hostname, or URL of the device
             session: Optional aiohttp session (created if not provided)
         """
-        self.host = host
-        self.base_url = f"http://{host}"
+        # Parse and normalize the host input to handle URLs
+        if host.startswith(("http://", "https://")):
+            parsed = urlparse(host)
+            self.host = parsed.netloc  # e.g., "192.168.1.1" or "192.168.1.1:8080"
+            self.base_url = f"{parsed.scheme}://{parsed.netloc}"
+        else:
+            self.host = host
+            self.base_url = f"http://{host}"
         self._session = session
         self._owns_session = session is None
 
@@ -215,18 +238,51 @@ class GeekMagicDevice:
             response.raise_for_status()
         _LOGGER.debug("Cleared all images")
 
-    async def test_connection(self) -> bool:
+    async def test_connection(self) -> ConnectionResult:
         """Test if the device is reachable.
 
         Returns:
-            True if connection successful, False otherwise
+            ConnectionResult with success status and error details if failed.
+            Can be used in boolean context (truthy if successful).
         """
         _LOGGER.debug("Testing connection to %s", self.host)
         try:
             await self.get_state()
+        except TimeoutError:
+            _LOGGER.warning("Connection test timed out for %s", self.host)
+            return ConnectionResult(
+                success=False,
+                error="timeout",
+                message="Connection timed out after 30 seconds",
+            )
+        except aiohttp.ClientConnectorDNSError as e:
+            _LOGGER.warning("DNS resolution failed for %s: %s", self.host, e)
+            return ConnectionResult(
+                success=False,
+                error="dns_error",
+                message=f"Could not resolve hostname: {self.host}",
+            )
+        except aiohttp.ClientConnectorError as e:
+            _LOGGER.warning("Connection failed for %s: %s", self.host, e)
+            return ConnectionResult(
+                success=False,
+                error="connection_refused",
+                message=str(e),
+            )
+        except aiohttp.ClientResponseError as e:
+            _LOGGER.warning("HTTP error for %s: %s", self.host, e)
+            return ConnectionResult(
+                success=False,
+                error="http_error",
+                message=f"HTTP error {e.status}: {e.message}",
+            )
         except Exception as e:
-            _LOGGER.debug("Connection test failed for %s: %s", self.host, e)
-            return False
+            _LOGGER.warning("Connection test failed for %s: %s", self.host, e)
+            return ConnectionResult(
+                success=False,
+                error="unknown",
+                message=str(e),
+            )
         else:
             _LOGGER.debug("Connection test successful for %s", self.host)
-            return True
+            return ConnectionResult(success=True)
