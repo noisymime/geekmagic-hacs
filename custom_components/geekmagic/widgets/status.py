@@ -2,16 +2,81 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from ..const import COLOR_GRAY, COLOR_LIME, COLOR_RED, COLOR_WHITE, PLACEHOLDER_NAME
 from .base import Widget, WidgetConfig
-from .helpers import estimate_max_chars, is_entity_on, resolve_label, truncate_text
+from .components import Color, Component
+from .helpers import estimate_max_chars, truncate_text
 
 if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant
-
     from ..render_context import RenderContext
+    from .state import EntityState, WidgetState
+
+
+def _is_entity_on(entity: EntityState | None) -> bool:
+    """Check if entity is in 'on' state."""
+    if entity is None:
+        return False
+    return entity.state.lower() in ("on", "true", "1", "home", "open", "unlocked")
+
+
+@dataclass
+class StatusIndicator(Component):
+    """Status indicator with dot, label, and status text."""
+
+    name: str
+    is_on: bool = False
+    on_color: Color = COLOR_LIME
+    off_color: Color = COLOR_RED
+    on_text: str = "ON"
+    off_text: str = "OFF"
+    icon: str | None = None
+    show_status_text: bool = True
+
+    def measure(
+        self, ctx: RenderContext, max_width: int, max_height: int
+    ) -> tuple[int, int]:
+        return (max_width, max_height)
+
+    def render(
+        self, ctx: RenderContext, x: int, y: int, width: int, height: int
+    ) -> None:
+        """Render status indicator."""
+        center_y = y + height // 2
+        font_name = ctx.get_font("small")
+        font_status = ctx.get_font("small")
+        padding = int(width * 0.06)
+        dot_radius = max(3, int(height * 0.12))
+        icon_size = max(10, min(20, int(height * 0.20)))
+
+        color = self.on_color if self.is_on else self.off_color
+        status_text = self.on_text if self.is_on else self.off_text
+
+        # Truncate name
+        max_name_len = estimate_max_chars(width, char_width=7, padding=20)
+        name = truncate_text(self.name, max_name_len, style="middle")
+
+        # Draw dot
+        dot_x = x + padding + dot_radius
+        ctx.draw_ellipse(
+            rect=(dot_x - dot_radius, center_y - dot_radius, dot_x + dot_radius, center_y + dot_radius),
+            fill=color,
+        )
+
+        # Draw icon
+        text_x = dot_x + dot_radius + int(width * 0.06)
+        if self.icon:
+            ctx.draw_icon(self.icon, (text_x, center_y - icon_size // 2), size=icon_size, color=COLOR_GRAY)
+            text_x += icon_size + 4
+
+        # Draw name
+        ctx.draw_text(name, (text_x, center_y), font=font_name, color=COLOR_WHITE, anchor="lm")
+
+        # Draw status text
+        if self.show_status_text:
+            ctx.draw_text(status_text, (x + width - padding, center_y), font=font_status, color=color, anchor="rm")
 
 
 class StatusWidget(Widget):
@@ -27,87 +92,79 @@ class StatusWidget(Widget):
         self.icon = config.options.get("icon")
         self.show_status_text = config.options.get("show_status_text", True)
 
-    def render(
-        self,
-        ctx: RenderContext,
-        hass: HomeAssistant | None = None,
-    ) -> None:
-        """Render the status widget.
+    def render(self, ctx: RenderContext, state: WidgetState) -> Component:
+        """Render the status widget."""
+        entity = state.entity
+        is_on = _is_entity_on(entity)
 
-        Args:
-            ctx: RenderContext for drawing
-            hass: Home Assistant instance
-        """
-        center_y = ctx.height // 2
-
-        # Get scaled fonts
-        font_name = ctx.get_font("small")
-        font_status = ctx.get_font("small")
-
-        # Calculate relative padding and sizes
-        padding = int(ctx.width * 0.06)
-        dot_radius = max(3, int(ctx.height * 0.12))
-        # Icon at 20% of height, capped at 20px to prevent dominating small cells
-        icon_size = max(10, min(20, int(ctx.height * 0.20)))
-
-        # Get entity state
-        state = self.get_entity_state(hass)
-
-        # Determine if on or off using helper
-        is_on = is_entity_on(state)
-
-        # Get color and text
-        color = self.on_color if is_on else self.off_color
-        status_text = self.on_text if is_on else self.off_text
-
-        # Get label using helpers
-        name = resolve_label(self.config, state, PLACEHOLDER_NAME)
-        if not name and state:
-            name = state.entity_id
+        name = self.config.label
+        if not name and entity:
+            name = entity.friendly_name
         name = name or PLACEHOLDER_NAME
 
-        # Truncate name using middle ellipsis to show start and end
-        max_name_len = estimate_max_chars(ctx.width, char_width=7, padding=20)
-        name = truncate_text(name, max_name_len, style="middle")
-
-        # Draw status indicator (dot)
-        dot_x = padding + dot_radius
-        dot_y = center_y
-
-        ctx.draw_ellipse(
-            rect=(dot_x - dot_radius, dot_y - dot_radius, dot_x + dot_radius, dot_y + dot_radius),
-            fill=color,
+        return StatusIndicator(
+            name=name,
+            is_on=is_on,
+            on_color=self.on_color,
+            off_color=self.off_color,
+            on_text=self.on_text,
+            off_text=self.off_text,
+            icon=self.icon,
+            show_status_text=self.show_status_text,
         )
 
-        # Draw icon if present
-        text_x = dot_x + dot_radius + int(ctx.width * 0.06)
-        if self.icon:
-            ctx.draw_icon(
-                self.icon,
-                (text_x, center_y - icon_size // 2),
-                size=icon_size,
-                color=COLOR_GRAY,
-            )
-            text_x += icon_size + 4
 
-        # Draw name
-        ctx.draw_text(
-            name,
-            (text_x, center_y),
-            font=font_name,
-            color=COLOR_WHITE,
-            anchor="lm",
-        )
+@dataclass
+class StatusListDisplay(Component):
+    """Status list display component."""
 
-        # Draw status text
-        if self.show_status_text:
-            ctx.draw_text(
-                status_text,
-                (ctx.width - padding, center_y),
-                font=font_status,
-                color=color,
-                anchor="rm",
+    items: list[tuple[str, bool, Color, Color]] = field(default_factory=list)  # (label, is_on, on_color, off_color)
+    title: str | None = None
+    on_text: str | None = None
+    off_text: str | None = None
+
+    def measure(
+        self, ctx: RenderContext, max_width: int, max_height: int
+    ) -> tuple[int, int]:
+        return (max_width, max_height)
+
+    def render(
+        self, ctx: RenderContext, x: int, y: int, width: int, height: int
+    ) -> None:
+        """Render status list."""
+        font_title = ctx.get_font("small")
+        font_label = ctx.get_font("tiny")
+        padding = int(width * 0.05)
+        current_y = y + padding
+
+        if self.title:
+            ctx.draw_text(self.title.upper(), (x + padding, current_y), font=font_title, color=COLOR_GRAY, anchor="lm")
+            current_y += int(height * 0.15)
+
+        available_height = y + height - current_y - padding
+        row_count = len(self.items) or 1
+        row_height = min(int(height * 0.17), available_height // row_count)
+        dot_radius = max(2, int(height * 0.025))
+        max_len = estimate_max_chars(width, char_width=7, padding=30)
+
+        for label, is_on, on_color, off_color in self.items:
+            color = on_color if is_on else off_color
+            label = truncate_text(label, max_len, style="middle")
+
+            dot_y = current_y + row_height // 2
+            ctx.draw_ellipse(
+                rect=(x + padding, dot_y - dot_radius, x + padding + dot_radius * 2, dot_y + dot_radius),
+                fill=color,
             )
+
+            ctx.draw_text(label, (x + padding + dot_radius * 2 + 6, dot_y), font=font_label, color=COLOR_WHITE, anchor="lm")
+
+            if self.on_text or self.off_text:
+                status_text = self.on_text if is_on else self.off_text
+                if status_text:
+                    ctx.draw_text(status_text, (x + width - padding, dot_y), font=font_label, color=color, anchor="rm")
+
+            current_y += row_height
 
 
 class StatusListWidget(Widget):
@@ -116,7 +173,6 @@ class StatusListWidget(Widget):
     def __init__(self, config: WidgetConfig) -> None:
         """Initialize the status list widget."""
         super().__init__(config)
-        # List of (entity_id, label) tuples
         self.entities = config.options.get("entities", [])
         self.on_color = config.options.get("on_color", COLOR_LIME)
         self.off_color = config.options.get("off_color", COLOR_RED)
@@ -128,47 +184,9 @@ class StatusListWidget(Widget):
         """Return list of entity IDs this widget depends on."""
         return [e[0] if isinstance(e, list | tuple) else e for e in self.entities]
 
-    def render(
-        self,
-        ctx: RenderContext,
-        hass: HomeAssistant | None = None,
-    ) -> None:
-        """Render the status list widget.
-
-        Args:
-            ctx: RenderContext for drawing
-            hass: Home Assistant instance
-        """
-        # Get scaled fonts
-        font_title = ctx.get_font("small")
-        font_label = ctx.get_font("tiny")
-
-        # Calculate relative padding
-        padding = int(ctx.width * 0.05)
-        current_y = padding
-
-        # Draw title if present
-        if self.title:
-            ctx.draw_text(
-                self.title.upper(),
-                (padding, current_y),
-                font=font_title,
-                color=COLOR_GRAY,
-                anchor="lm",
-            )
-            title_height = int(ctx.height * 0.15)
-            current_y += title_height
-
-        # Calculate row height relative to container
-        available_height = ctx.height - current_y - padding
-        row_count = len(self.entities) or 1
-        row_height = min(int(ctx.height * 0.17), available_height // row_count)
-        dot_radius = max(2, int(ctx.height * 0.025))
-
-        # Calculate max label length once
-        max_len = estimate_max_chars(ctx.width, char_width=7, padding=30)
-
-        # Draw each entity
+    def render(self, ctx: RenderContext, state: WidgetState) -> Component:
+        """Render the status list widget."""
+        items = []
         for entry in self.entities:
             if isinstance(entry, list | tuple):
                 entity_id, label = entry[0], entry[1]
@@ -176,52 +194,17 @@ class StatusListWidget(Widget):
                 entity_id = entry
                 label = None
 
-            # Get state
-            state = hass.states.get(entity_id) if hass else None
-
-            # Use helper for state checking
-            is_on = is_entity_on(state)
-            if state is not None and not label:
-                label = state.attributes.get("friendly_name", entity_id)
+            entity = state.get_entity(entity_id)
+            is_on = _is_entity_on(entity)
+            if entity and not label:
+                label = entity.friendly_name
             label = label or entity_id
 
-            # Get color
-            color = self.on_color if is_on else self.off_color
+            items.append((label, is_on, self.on_color, self.off_color))
 
-            # Truncate label using middle ellipsis
-            label = truncate_text(label, max_len, style="middle")
-
-            # Draw dot
-            dot_y = current_y + row_height // 2
-            ctx.draw_ellipse(
-                rect=(
-                    padding,
-                    dot_y - dot_radius,
-                    padding + dot_radius * 2,
-                    dot_y + dot_radius,
-                ),
-                fill=color,
-            )
-
-            # Draw label
-            ctx.draw_text(
-                label,
-                (padding + dot_radius * 2 + 6, dot_y),
-                font=font_label,
-                color=COLOR_WHITE,
-                anchor="lm",
-            )
-
-            # Draw status text
-            if self.on_text or self.off_text:
-                status_text = self.on_text if is_on else self.off_text
-                if status_text:
-                    ctx.draw_text(
-                        status_text,
-                        (ctx.width - padding, dot_y),
-                        font=font_label,
-                        color=color,
-                        anchor="rm",
-                    )
-
-            current_y += row_height
+        return StatusListDisplay(
+            items=items,
+            title=self.title,
+            on_text=self.on_text,
+            off_text=self.off_text,
+        )

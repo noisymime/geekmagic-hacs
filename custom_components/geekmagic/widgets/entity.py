@@ -17,16 +17,38 @@ from .components import Component, Panel
 from .helpers import (
     estimate_max_chars,
     format_value_with_unit,
-    get_entity_icon,
-    get_unit,
-    resolve_label,
     truncate_text,
 )
 
 if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant
-
     from ..render_context import RenderContext
+    from .state import WidgetState
+
+
+def _get_entity_icon(entity_state) -> str | None:
+    """Get icon from entity state, handling MDI format."""
+    if entity_state is None:
+        return None
+    icon = entity_state.icon
+    if icon and icon.startswith("mdi:"):
+        return icon[4:]  # Strip "mdi:" prefix
+    return None
+
+
+def _get_unit(entity_state) -> str:
+    """Get unit of measurement from entity state."""
+    if entity_state is None:
+        return ""
+    return entity_state.unit or ""
+
+
+def _resolve_label(config, entity_state, default: str = "") -> str:
+    """Get label from config or entity friendly_name."""
+    if config.label:
+        return config.label
+    if entity_state:
+        return entity_state.friendly_name
+    return default
 
 
 class EntityWidget(Widget):
@@ -42,29 +64,24 @@ class EntityWidget(Widget):
         self.show_panel = config.options.get("show_panel", False)
         self.precision = config.options.get("precision")  # Decimal places for numeric values
 
-    def render(
-        self,
-        ctx: RenderContext,
-        hass: HomeAssistant | None = None,
-    ) -> Component:
+    def render(self, ctx: RenderContext, state: WidgetState) -> Component:
         """Render the entity widget.
 
         Args:
             ctx: RenderContext for drawing
-            hass: Home Assistant instance
+            state: Widget state with entity data
 
         Returns:
             Component tree for rendering
         """
-        # Get entity state
-        state = self.get_entity_state(hass)
+        entity = state.entity
 
-        if state is None:
+        if entity is None:
             value = PLACEHOLDER_VALUE
             unit = ""
             name = self.config.label or self.config.entity_id or PLACEHOLDER_NAME
         else:
-            value = state.state
+            value = entity.state
             # Apply precision formatting if specified and value is numeric
             if self.precision is not None:
                 try:
@@ -72,12 +89,10 @@ class EntityWidget(Widget):
                     value = f"{numeric_value:.{self.precision}f}"
                 except (ValueError, TypeError):
                     pass  # Keep original value if not numeric
-            unit = get_unit(state) if self.show_unit else ""
-            name = resolve_label(self.config, state, state.entity_id)
+            unit = _get_unit(entity) if self.show_unit else ""
+            name = _resolve_label(self.config, entity, entity.entity_id)
 
-        # Truncate value and name - use generous estimates to avoid over-truncation
-        # Values can be longer text (e.g., "Team Meeting"), labels use smaller font
-        # Use middle truncation for names to show start and end (e.g., "Living..Room")
+        # Truncate value and name
         max_value_chars = estimate_max_chars(ctx.width, char_width=6, padding=6)
         max_name_chars = estimate_max_chars(ctx.width, char_width=5, padding=4)
         value = truncate_text(value, max_value_chars, style="middle")
@@ -87,11 +102,10 @@ class EntityWidget(Widget):
         value_text = format_value_with_unit(value, unit)
         label = name if self.show_name else None
 
-        # Determine icon to use (priority: explicit config > entity icon > none)
+        # Determine icon to use
         icon = self.icon
         if not icon and self.show_icon:
-            # Try to get icon from HA entity (e.g., "mdi:thermometer")
-            icon = get_entity_icon(state)
+            icon = _get_entity_icon(entity)
 
         # Build component based on whether we have an icon
         if icon:
@@ -111,7 +125,7 @@ class EntityWidget(Widget):
                 label_color=COLOR_GRAY,
             )
 
-        # Wrap in panel if enabled (uses theme.surface color)
+        # Wrap in panel if enabled
         if self.show_panel:
             return Panel(child=content)
 

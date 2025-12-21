@@ -2,26 +2,120 @@
 
 from __future__ import annotations
 
-import contextlib
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, ClassVar
 
 from ..const import COLOR_CYAN, COLOR_GRAY
 from .base import Widget, WidgetConfig
+from .components import Color, Component
 
 if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant
-
     from ..render_context import RenderContext
+    from .state import WidgetState
+
+
+@dataclass
+class ChartDisplay(Component):
+    """Sparkline chart display component."""
+
+    data: list[float] = field(default_factory=list)
+    label: str | None = None
+    current_value: float | None = None
+    unit: str = ""
+    color: Color = COLOR_CYAN
+    show_range: bool = True
+    fill: bool = False
+    gradient: bool = False
+
+    def measure(
+        self, ctx: RenderContext, max_width: int, max_height: int
+    ) -> tuple[int, int]:
+        return (max_width, max_height)
+
+    def render(
+        self, ctx: RenderContext, x: int, y: int, width: int, height: int
+    ) -> None:
+        """Render chart with header, sparkline, and optional range."""
+        font_label = ctx.get_font("small")
+        font_value = ctx.get_font("regular")
+        padding = int(width * 0.08)
+
+        # Calculate chart area
+        header_height = int(height * 0.15) if self.label else int(height * 0.08)
+        is_binary = self._is_binary_data()
+        footer_height = int(height * 0.12) if self.show_range and not is_binary else int(height * 0.04)
+        chart_top = y + header_height
+        chart_bottom = y + height - footer_height
+        chart_rect = (x + padding, chart_top, x + width - padding, chart_bottom)
+
+        # Draw header with label and value
+        header_y = y + int(height * 0.08)
+
+        if self.label:
+            max_label_len = max(3, width // 12)
+            display_name = self.label.upper()
+            if len(display_name) > max_label_len:
+                display_name = display_name[: max_label_len - 2] + ".."
+            ctx.draw_text(
+                display_name,
+                (x + padding, header_y),
+                font=font_label,
+                color=COLOR_GRAY,
+                anchor="lm",
+            )
+
+        if self.current_value is not None:
+            value_str = f"{self.current_value:.1f}{self.unit}"
+            ctx.draw_text(
+                value_str,
+                (x + width - padding, header_y),
+                font=font_value,
+                color=self.color,
+                anchor="rm",
+            )
+
+        # Draw chart
+        if len(self.data) >= 2:
+            if is_binary:
+                ctx.draw_timeline_bar(chart_rect, self.data, on_color=self.color)
+            else:
+                ctx.draw_sparkline(
+                    chart_rect, self.data, color=self.color, fill=self.fill, gradient=self.gradient
+                )
+
+                if self.show_range:
+                    min_val = min(self.data)
+                    max_val = max(self.data)
+                    range_y = chart_bottom + int(height * 0.08)
+                    ctx.draw_text(
+                        f"{min_val:.1f}",
+                        (x + padding, range_y),
+                        font=font_label,
+                        color=COLOR_GRAY,
+                        anchor="lm",
+                    )
+                    ctx.draw_text(
+                        f"{max_val:.1f}",
+                        (x + width - padding, range_y),
+                        font=font_label,
+                        color=COLOR_GRAY,
+                        anchor="rm",
+                    )
+        else:
+            center_x = x + width // 2
+            center_y = (chart_top + chart_bottom) // 2
+            ctx.draw_text("No data", (center_x, center_y), font=font_label, color=COLOR_GRAY, anchor="mm")
+
+    def _is_binary_data(self) -> bool:
+        """Check if data is binary (all 0.0 or 1.0)."""
+        if not self.data:
+            return False
+        return all(v in {0.0, 1.0} for v in self.data)
 
 
 class ChartWidget(Widget):
-    """Widget that displays a sparkline chart or timeline bar from entity history.
+    """Widget that displays a sparkline chart from entity history."""
 
-    Automatically detects binary data (all 0.0/1.0 values) and displays
-    as a timeline bar instead of a sparkline chart.
-    """
-
-    # Map period strings to hours
     PERIOD_TO_HOURS: ClassVar[dict[str, float]] = {
         "5 min": 5 / 60,
         "15 min": 15 / 60,
@@ -33,12 +127,10 @@ class ChartWidget(Widget):
     def __init__(self, config: WidgetConfig) -> None:
         """Initialize the chart widget."""
         super().__init__(config)
-        # Support 'period' (string like "5 min") and legacy 'hours' (number)
         period = config.options.get("period")
         if period and isinstance(period, str):
             self.hours = self.PERIOD_TO_HOURS.get(period, 24)
         elif period and isinstance(period, int | float):
-            # Legacy numeric period in minutes
             self.hours = period / 60
         else:
             self.hours = config.options.get("hours", 24)
@@ -47,141 +139,34 @@ class ChartWidget(Widget):
         self.fill = config.options.get("fill", False)
         self.color_gradient = config.options.get("color_gradient", False)
 
-        # History data cache (populated externally)
-        self._history_data: list[float] = []
-
-    def set_history(self, data: list[float]) -> None:
-        """Set the history data for the chart.
-
-        Args:
-            data: List of numeric values
-        """
-        self._history_data = data
-
-    def _is_binary_data(self) -> bool:
-        """Check if history data is binary (all values are 0.0 or 1.0).
-
-        Returns:
-            True if data appears to be from a binary sensor
-        """
-        if not self._history_data:
-            return False
-        return all(v in {0.0, 1.0} for v in self._history_data)
-
-    def render(
-        self,
-        ctx: RenderContext,
-        hass: HomeAssistant | None = None,
-    ) -> None:
+    def render(self, ctx: RenderContext, state: WidgetState) -> Component:
         """Render the chart widget.
 
         Args:
             ctx: RenderContext for drawing
-            hass: Home Assistant instance
+            state: Widget state with history data
         """
-        # Get scaled fonts
-        font_label = ctx.get_font("small")
-        font_value = ctx.get_font("regular")
-
-        # Calculate relative padding
-        padding = int(ctx.width * 0.08)
-
-        # Get current value from entity
-        state = self.get_entity_state(hass)
+        entity = state.entity
         current_value = None
         unit = ""
-        name = self.config.label or "Chart"
+        label = self.config.label
 
-        if state is not None:
-            with contextlib.suppress(ValueError, TypeError):
-                current_value = float(state.state)
-            unit = state.attributes.get("unit_of_measurement", "")
-            name = self.config.label or state.attributes.get("friendly_name", "Chart")
+        if entity is not None:
+            try:
+                current_value = float(entity.state)
+            except (ValueError, TypeError):
+                pass
+            unit = entity.unit or ""
+            if not label:
+                label = entity.friendly_name
 
-        # Calculate chart area relative to container
-        header_height = int(ctx.height * 0.15) if self.config.label else int(ctx.height * 0.08)
-        footer_height = int(ctx.height * 0.12) if self.show_range else int(ctx.height * 0.04)
-        chart_top = header_height
-        chart_bottom = ctx.height - footer_height
-        chart_rect = (padding, chart_top, ctx.width - padding, chart_bottom)
-
-        # Draw header with label and value
-        # Use horizontal layout (label left, value right) to prevent overlap
-        header_y = int(ctx.height * 0.08)
-
-        if self.config.label:
-            # For small containers (<100px), truncate label
-            max_label_len = max(3, ctx.width // 12)
-            display_name = name.upper()
-            if len(display_name) > max_label_len:
-                display_name = display_name[: max_label_len - 2] + ".."
-
-            ctx.draw_text(
-                display_name,
-                (padding, header_y),
-                font=font_label,
-                color=COLOR_GRAY,
-                anchor="lm",  # Left-align to prevent overlap with value
-            )
-
-        # Draw current value (always right-aligned)
-        if self.show_value and current_value is not None:
-            value_str = f"{current_value:.1f}{unit}"
-            ctx.draw_text(
-                value_str,
-                (ctx.width - padding, header_y),
-                font=font_value,
-                color=self.config.color or COLOR_CYAN,
-                anchor="rm",
-            )
-
-        # Draw chart
-        if self._history_data and len(self._history_data) >= 2:
-            color = self.config.color or COLOR_CYAN
-            is_binary = self._is_binary_data()
-
-            if is_binary:
-                # Binary data: use timeline bar visualization
-                ctx.draw_timeline_bar(chart_rect, self._history_data, on_color=color)
-                # No range footer for binary (would just be 0/1)
-            else:
-                # Numeric data: use sparkline chart
-                ctx.draw_sparkline(
-                    chart_rect,
-                    self._history_data,
-                    color=color,
-                    fill=self.fill,
-                    gradient=self.color_gradient,
-                )
-
-                # Draw min/max range for numeric data
-                if self.show_range:
-                    min_val = min(self._history_data)
-                    max_val = max(self._history_data)
-                    range_y = chart_bottom + int(ctx.height * 0.08)
-
-                    ctx.draw_text(
-                        f"{min_val:.1f}",
-                        (padding, range_y),
-                        font=font_label,
-                        color=COLOR_GRAY,
-                        anchor="lm",
-                    )
-                    ctx.draw_text(
-                        f"{max_val:.1f}",
-                        (ctx.width - padding, range_y),
-                        font=font_label,
-                        color=COLOR_GRAY,
-                        anchor="rm",
-                    )
-        else:
-            # No data - show placeholder
-            center_x = ctx.width // 2
-            center_y = (chart_top + chart_bottom) // 2
-            ctx.draw_text(
-                "No data",
-                (center_x, center_y),
-                font=font_label,
-                color=COLOR_GRAY,
-                anchor="mm",
-            )
+        return ChartDisplay(
+            data=list(state.history),
+            label=label,
+            current_value=current_value if self.show_value else None,
+            unit=unit,
+            color=self.config.color or COLOR_CYAN,
+            show_range=self.show_range,
+            fill=self.fill,
+            gradient=self.color_gradient,
+        )

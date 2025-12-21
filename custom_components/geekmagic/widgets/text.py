@@ -9,9 +9,8 @@ from .base import Widget, WidgetConfig
 from .components import Column, Component, Text
 
 if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant
-
     from ..render_context import RenderContext
+    from .state import WidgetState
 
 
 # Map widget align to component align
@@ -34,21 +33,17 @@ class TextWidget(Widget):
         # Entity ID for dynamic text (from options, takes precedence over widget entity_id)
         self.dynamic_entity_id = config.options.get("entity_id")
 
-    def render(
-        self,
-        ctx: RenderContext,
-        hass: HomeAssistant | None = None,
-    ) -> Component:
+    def render(self, ctx: RenderContext, state: WidgetState) -> Component:
         """Render the text widget.
 
         Args:
             ctx: RenderContext for drawing
-            hass: Home Assistant instance
+            state: Widget state with entity data
 
         Returns:
             Component tree for rendering
         """
-        text = self._get_text(hass)
+        text = self._get_text(state)
         color = self.config.color or COLOR_WHITE
         align = ALIGN_MAP.get(self.align, "center")
 
@@ -68,17 +63,29 @@ class TextWidget(Widget):
             gap=4,
         )
 
-    def _get_text(self, hass: HomeAssistant | None) -> str:
+    def _get_text(self, state: WidgetState) -> str:
         """Get the text to display.
 
         If entity_id is set (from options or widget config), returns the entity state.
         Otherwise returns the configured text.
         """
-        # Check dynamic entity_id from options first, then widget config entity_id
-        entity_id = self.dynamic_entity_id or self.config.entity_id
-        if entity_id and hass:
-            state = hass.states.get(entity_id)
-            if state:
-                return state.state
+        # Check for entity in state (from config.entity_id or dynamic_entity_id)
+        if state.entity:
+            return state.entity.state
+
+        # Check for dynamic entity in additional entities
+        if self.dynamic_entity_id:
+            entity = state.get_entity(self.dynamic_entity_id)
+            if entity:
+                return entity.state
 
         return self.text
+
+    def get_entities(self) -> list[str]:
+        """Return entity IDs this widget depends on."""
+        entities = []
+        if self.config.entity_id:
+            entities.append(self.config.entity_id)
+        if self.dynamic_entity_id and self.dynamic_entity_id != self.config.entity_id:
+            entities.append(self.dynamic_entity_id)
+        return entities
