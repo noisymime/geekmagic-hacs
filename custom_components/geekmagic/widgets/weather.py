@@ -12,7 +12,7 @@ from ..const import (
     COLOR_WHITE,
 )
 from .base import Widget, WidgetConfig
-from .components import Column, Component, Icon, Text
+from .components import Column, Component, Icon, Padding, Row, Stack, Text
 
 if TYPE_CHECKING:
     from ..render_context import RenderContext
@@ -56,150 +56,171 @@ class WeatherDisplay(Component):
 
     def render(self, ctx: RenderContext, x: int, y: int, width: int, height: int) -> None:
         """Render weather."""
-        padding = int(width * 0.04)
         icon_name = WEATHER_ICONS.get(self.condition, "weather-sunny")
 
         if height > 120 and self.show_forecast:
-            self._render_full(ctx, x, y, width, height, icon_name, padding)
+            component = self._build_full(ctx, width, height, icon_name)
         else:
-            self._render_compact(ctx, x, y, width, height, icon_name, padding)
+            component = self._build_compact(ctx, width, height, icon_name)
 
-    def _render_full(
+        component.render(ctx, x, y, width, height)
+
+    def _build_full(
         self,
         ctx: RenderContext,
-        x: int,
-        y: int,
         width: int,
         height: int,
         icon_name: str,
-        padding: int,
-    ) -> None:
-        """Render full weather with forecast."""
-        center_x = x + width // 2
-        font_temp = ctx.get_font("xlarge")
-        font_condition = ctx.get_font("small")
-        font_tiny = ctx.get_font("tiny")
-
-        current_y = y + padding
-
+    ) -> Component:
+        """Build full weather layout with forecast."""
+        padding = int(width * 0.04)
         icon_size = max(24, int(height * 0.25))
-        ctx.draw_icon(
-            icon_name, (center_x - icon_size // 2, current_y), size=icon_size, color=COLOR_GOLD
-        )
 
+        # Main weather display (icon, temp, condition)
         temp_str = f"{self.temperature}°" if self.temperature != "--" else "--"
-        ctx.draw_text(
-            temp_str,
-            (center_x, current_y + icon_size + int(height * 0.08)),
-            font=font_temp,
-            color=COLOR_WHITE,
-            anchor="mm",
+
+        main_weather = Column(
+            children=[
+                Icon(icon_name, size=icon_size, color=COLOR_GOLD),
+                Text(temp_str, font="xlarge", color=COLOR_WHITE),
+                Text(self.condition.replace("-", " ").title(), font="small", color=COLOR_GRAY),
+            ],
+            gap=int(height * 0.04),
+            align="center",
+            justify="start",
+            padding=padding,
         )
 
-        ctx.draw_text(
-            self.condition.replace("-", " ").title(),
-            (center_x, current_y + icon_size + int(height * 0.22)),
-            font=font_condition,
-            color=COLOR_GRAY,
-            anchor="mm",
-        )
-
+        # Humidity indicator (if enabled)
+        humidity_row = None
         if self.show_humidity:
             humidity_icon_size = max(8, int(height * 0.07))
-            humidity_y = current_y + icon_size + int(height * 0.30)
-            ctx.draw_icon(
-                "water-percent",
-                (x + padding, humidity_y),
-                size=humidity_icon_size,
-                color=COLOR_CYAN,
-            )
-            ctx.draw_text(
-                f"{self.humidity}%",
-                (x + padding + humidity_icon_size + 4, humidity_y + humidity_icon_size // 2),
-                font=font_tiny,
-                color=COLOR_CYAN,
-                anchor="lm",
+            humidity_row = Row(
+                children=[
+                    Icon("water-percent", size=humidity_icon_size, color=COLOR_CYAN),
+                    Text(f"{self.humidity}%", font="tiny", color=COLOR_CYAN, align="start"),
+                ],
+                gap=4,
+                align="center",
+                justify="start",
+                padding=padding,
             )
 
+        # Forecast items
+        forecast_component = None
         if self.forecast and self.show_forecast:
-            forecast_y = y + height - int(height * 0.28)
             forecast_items = self.forecast[: self.forecast_days]
             if forecast_items:
-                item_width = (width - padding * 2) // len(forecast_items)
                 forecast_icon_size = max(10, int(height * 0.10))
+                forecast_columns = []
 
                 for i, day in enumerate(forecast_items):
-                    fx = x + padding + i * item_width + item_width // 2
                     day_condition = day.get("condition", "sunny")
                     day_temp = day.get("temperature", "--")
                     day_temp_low = day.get("templow")
                     day_name = day.get("datetime", "")[:3] if day.get("datetime") else f"D{i + 1}"
-
-                    ctx.draw_text(
-                        day_name.upper(),
-                        (fx, forecast_y),
-                        font=font_tiny,
-                        color=COLOR_GRAY,
-                        anchor="mm",
-                    )
-
                     day_icon = WEATHER_ICONS.get(day_condition, "weather-sunny")
-                    ctx.draw_icon(
-                        day_icon,
-                        (fx - forecast_icon_size // 2, forecast_y + int(height * 0.05)),
-                        size=forecast_icon_size,
-                        color=COLOR_GRAY,
-                    )
 
                     if self.show_high_low and day_temp_low is not None:
                         temp_str = f"{day_temp}°/{day_temp_low}°"
                     else:
                         temp_str = f"{day_temp}°"
-                    ctx.draw_text(
-                        temp_str,
-                        (fx, forecast_y + int(height * 0.20)),
-                        font=font_tiny,
-                        color=COLOR_WHITE,
-                        anchor="mm",
+
+                    forecast_columns.append(
+                        Column(
+                            children=[
+                                Text(day_name.upper(), font="tiny", color=COLOR_GRAY),
+                                Icon(day_icon, size=forecast_icon_size, color=COLOR_GRAY),
+                                Text(temp_str, font="tiny", color=COLOR_WHITE),
+                            ],
+                            gap=int(height * 0.02),
+                            align="center",
+                            justify="center",
+                        )
                     )
 
-    def _render_compact(
+                forecast_component = Row(
+                    children=forecast_columns,
+                    gap=0,
+                    align="center",
+                    justify="space-around",
+                    padding=padding,
+                )
+
+        # Build the final layout
+        if humidity_row and forecast_component:
+            # All three sections - use absolute positioning via Stack
+            return Stack(
+                children=[
+                    main_weather,
+                    # Position humidity slightly below center
+                    Padding(
+                        child=humidity_row,
+                        top=int(height * 0.35),
+                    ),
+                    # Position forecast at bottom
+                    Padding(
+                        child=forecast_component,
+                        top=int(height * 0.72),
+                    ),
+                ]
+            )
+        if humidity_row:
+            # Just main + humidity
+            return Column(
+                children=[main_weather, humidity_row],
+                gap=int(height * 0.05),
+                align="start",
+                justify="start",
+            )
+        if forecast_component:
+            # Just main + forecast
+            return Column(
+                children=[main_weather, forecast_component],
+                gap=int(height * 0.10),
+                align="center",
+                justify="space-between",
+            )
+        # Just main weather
+        return main_weather
+
+    def _build_compact(
         self,
         ctx: RenderContext,
-        x: int,
-        y: int,
         width: int,
         height: int,
         icon_name: str,
-        padding: int,
-    ) -> None:
-        """Render compact weather."""
-        center_y = y + height // 2
-        font_temp = ctx.get_font("large")
-        font_tiny = ctx.get_font("tiny")
-
+    ) -> Component:
+        """Build compact weather layout."""
+        padding = int(width * 0.04)
         icon_size = max(16, min(32, int(height * 0.40)))
-        ctx.draw_icon(
-            icon_name, (x + padding, center_y - icon_size // 2), size=icon_size, color=COLOR_GOLD
-        )
-
         temp_str = f"{self.temperature}°" if self.temperature != "--" else "--"
-        ctx.draw_text(
-            temp_str,
-            (x + width - padding, center_y - int(height * 0.04)),
-            font=font_temp,
-            color=COLOR_WHITE,
-            anchor="rm",
-        )
+
+        # Left side: icon
+        left_side = Icon(icon_name, size=icon_size, color=COLOR_GOLD)
+
+        # Right side: temperature and optionally humidity
+        right_children = [Text(temp_str, font="large", color=COLOR_WHITE, align="end")]
 
         if self.show_humidity:
-            ctx.draw_text(
-                f"{self.humidity}%",
-                (x + width - padding, center_y + int(height * 0.15)),
-                font=font_tiny,
-                color=COLOR_CYAN,
-                anchor="rm",
+            right_children.append(
+                Text(f"{self.humidity}%", font="tiny", color=COLOR_CYAN, align="end")
             )
+
+        right_side = Column(
+            children=right_children,
+            gap=int(height * 0.08),
+            align="end",
+            justify="center",
+        )
+
+        return Row(
+            children=[left_side, right_side],
+            gap=padding,
+            align="center",
+            justify="space-between",
+            padding=padding,
+        )
 
 
 def _weather_placeholder() -> Component:

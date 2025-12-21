@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from ..const import COLOR_GRAY, COLOR_LIME, COLOR_RED, COLOR_WHITE, PLACEHOLDER_NAME
 from .base import Widget, WidgetConfig
-from .components import Color, Component
+from .components import Color, Column, Component, Icon, Row, Spacer, Text
 from .helpers import estimate_max_chars, truncate_text
 
 if TYPE_CHECKING:
@@ -39,10 +39,7 @@ class StatusIndicator(Component):
         return (max_width, max_height)
 
     def render(self, ctx: RenderContext, x: int, y: int, width: int, height: int) -> None:
-        """Render status indicator."""
-        center_y = y + height // 2
-        font_name = ctx.get_font("small")
-        font_status = ctx.get_font("small")
+        """Render status indicator using component primitives."""
         padding = int(width * 0.06)
         icon_size = max(12, min(24, int(height * 0.35)))
 
@@ -53,26 +50,29 @@ class StatusIndicator(Component):
         max_name_len = estimate_max_chars(width, char_width=7, padding=20)
         name = truncate_text(self.name, max_name_len, style="middle")
 
-        # Draw icon (colored by state) - no separate dot
-        text_x = x + padding
+        # Build component tree
+        children = []
+
+        # Add icon if provided
         if self.icon:
-            ctx.draw_icon(
-                self.icon, (text_x, center_y - icon_size // 2), size=icon_size, color=color
-            )
-            text_x += icon_size + 6
+            children.append(Icon(name=self.icon, size=icon_size, color=color))
 
-        # Draw name
-        ctx.draw_text(name, (text_x, center_y), font=font_name, color=COLOR_WHITE, anchor="lm")
+        # Add name text
+        children.append(Text(text=name, font="small", color=COLOR_WHITE, align="start"))
 
-        # Draw status text
+        # Add spacer to push status text to the right
         if self.show_status_text:
-            ctx.draw_text(
-                status_text,
-                (x + width - padding, center_y),
-                font=font_status,
-                color=color,
-                anchor="rm",
-            )
+            children.append(Spacer())
+            children.append(Text(text=status_text, font="small", color=color, align="end"))
+
+        # Render as a row
+        Row(
+            children=children,
+            gap=6,
+            padding=padding,
+            align="center",
+            justify="start",
+        ).render(ctx, x, y, width, height)
 
 
 class StatusWidget(Widget):
@@ -125,60 +125,72 @@ class StatusListDisplay(Component):
         return (max_width, max_height)
 
     def render(self, ctx: RenderContext, x: int, y: int, width: int, height: int) -> None:
-        """Render status list."""
-        font_title = ctx.get_font("small")
-        font_label = ctx.get_font("tiny")
+        """Render status list using component primitives."""
         padding = int(width * 0.05)
-        current_y = y + padding
 
+        # Build list of rows
+        rows: list[Component] = []
+
+        # Add title if provided
         if self.title:
-            ctx.draw_text(
-                self.title.upper(),
-                (x + padding, current_y),
-                font=font_title,
-                color=COLOR_GRAY,
-                anchor="lm",
+            rows.append(
+                Text(text=self.title.upper(), font="small", color=COLOR_GRAY, align="start")
             )
-            current_y += int(height * 0.15)
 
-        available_height = y + height - current_y - padding
+        # Calculate dimensions for items
+        available_height = height - padding * 2
+        if self.title:
+            available_height -= int(height * 0.15)
+
         row_count = len(self.items) or 1
         row_height = min(int(height * 0.17), available_height // row_count)
         icon_size = max(10, min(16, int(row_height * 0.7)))
         max_len = estimate_max_chars(width, char_width=7, padding=30)
 
+        # Build each item row
         for label, is_on, on_color, off_color, icon in self.items:
             color = on_color if is_on else off_color
             display_label = truncate_text(label, max_len, style="middle")
 
-            row_y = current_y + row_height // 2
-            text_x = x + padding
+            # Build row children
+            row_children = []
 
-            # Draw icon colored by state (instead of dot)
+            # Add icon if provided
             if icon:
-                ctx.draw_icon(icon, (text_x, row_y - icon_size // 2), size=icon_size, color=color)
-                text_x += icon_size + 6
+                row_children.append(Icon(name=icon, size=icon_size, color=color))
 
-            ctx.draw_text(
-                display_label,
-                (text_x, row_y),
-                font=font_label,
-                color=COLOR_WHITE,
-                anchor="lm",
+            # Add label
+            row_children.append(
+                Text(text=display_label, font="tiny", color=COLOR_WHITE, align="start")
             )
 
+            # Add status text if configured
             if self.on_text or self.off_text:
                 status_text = self.on_text if is_on else self.off_text
                 if status_text:
-                    ctx.draw_text(
-                        status_text,
-                        (x + width - padding, row_y),
-                        font=font_label,
-                        color=color,
-                        anchor="rm",
+                    row_children.append(Spacer())
+                    row_children.append(
+                        Text(text=status_text, font="tiny", color=color, align="end")
                     )
 
-            current_y += row_height
+            # Create row component
+            rows.append(
+                Row(
+                    children=row_children,
+                    gap=6,
+                    align="center",
+                    justify="start",
+                )
+            )
+
+        # Render all rows in a column
+        Column(
+            children=rows,
+            gap=4 if self.title else 2,
+            padding=padding,
+            align="stretch",
+            justify="start",
+        ).render(ctx, x, y, width, height)
 
 
 class StatusListWidget(Widget):

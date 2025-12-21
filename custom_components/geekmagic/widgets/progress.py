@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from ..const import COLOR_CYAN, COLOR_DARK_GRAY, COLOR_GRAY, COLOR_WHITE
 from .base import Widget, WidgetConfig
-from .components import Color, Component
+from .components import Bar, Color, Column, Component, Icon, Row, Spacer, Text
 from .helpers import format_number
 
 if TYPE_CHECKING:
@@ -65,102 +65,94 @@ class ProgressDisplay(Component):
 
         if is_compact:
             # Compact: icon + value on first line, bar + percent on second
-            font_value = ctx.get_font("small")
-            font_percent = ctx.get_font("tiny")
-
-            # Row 1: Icon + Value
-            row1_y = y + int(height * 0.30)
-            text_x = x + padding
-            if self.icon:
-                ctx.draw_icon(
-                    self.icon,
-                    (x + padding, row1_y - icon_size // 2),
-                    size=icon_size,
-                    color=self.color,
-                )
-                text_x = x + padding + icon_size + 4
-
             value_text = f"{display_value}/{display_target}" if self.show_target else display_value
             if self.unit:
                 value_text += f" {self.unit}"
-            ctx.draw_text(
-                value_text, (text_x, row1_y), font=font_value, color=COLOR_WHITE, anchor="lm"
+
+            # Row 1: Icon + Value
+            row1_children = []
+            if self.icon:
+                row1_children.append(Icon(name=self.icon, size=icon_size, color=self.color))
+            row1_children.append(
+                Text(text=value_text, font="small", color=COLOR_WHITE, align="start")
             )
 
             # Row 2: Progress bar + percent
-            bar_y = y + int(height * 0.60)
-            percent_width = int(width * 0.22)
-            bar_rect = (x + padding, bar_y, x + width - percent_width - padding, bar_y + bar_height)
-            ctx.draw_bar(bar_rect, percent, self.color, COLOR_DARK_GRAY)
-            ctx.draw_text(
-                f"{percent:.0f}%",
-                (x + width - padding, bar_y + bar_height // 2),
-                font=font_percent,
-                color=COLOR_WHITE,
-                anchor="rm",
-            )
+            row2_children = [
+                Bar(
+                    percent=percent,
+                    color=self.color,
+                    background=COLOR_DARK_GRAY,
+                    height=bar_height,
+                ),
+                Text(text=f"{percent:.0f}%", font="tiny", color=COLOR_WHITE, align="end"),
+            ]
+
+            # Build column with two rows
+            Column(
+                children=[
+                    Row(children=row1_children, gap=4, align="center", padding=padding),
+                    Row(children=row2_children, gap=8, align="center", padding=padding),
+                ],
+                gap=int(height * 0.10),
+                justify="center",
+            ).render(ctx, x, y, width, height)
+
         else:
             # Full layout: label + value on first line, bar + percent on second
-            font_label = ctx.get_font("small")
-            font_value = ctx.get_font("regular")
-            font_percent = ctx.get_font("small")
-
-            top_y = y + int(height * 0.25)
-
-            # Icon
-            text_x = x + padding
-            if self.icon:
-                ctx.draw_icon(
-                    self.icon,
-                    (x + padding, top_y - icon_size // 2),
-                    size=icon_size,
-                    color=self.color,
-                )
-                text_x = x + padding + icon_size + 4
-
-            # Value / target text
             value_text = f"{display_value}/{display_target}" if self.show_target else display_value
             if self.unit:
                 value_text += f" {self.unit}"
-            value_width, _ = ctx.get_text_size(value_text, font_value)
 
-            # Check if label fits
+            # Top row: Icon + Label + Spacer + Value
+            top_row_children = []
+            if self.icon:
+                top_row_children.append(Icon(name=self.icon, size=icon_size, color=self.color))
+
+            # Check if label fits by measuring
+            font_label = ctx.get_font("small")
+            font_value = ctx.get_font("regular")
             label_text = self.label.upper()
             label_width, _ = ctx.get_text_size(label_text, font_label)
-            available_for_label = (x + width - padding) - text_x - value_width - 8
+            value_width, _ = ctx.get_text_size(value_text, font_value)
+            icon_width = icon_size + 4 if self.icon else 0
+            available_for_label = width - padding * 2 - icon_width - value_width - 8
 
             if available_for_label >= label_width:
-                # Label fits - draw both
-                ctx.draw_text(
-                    label_text, (text_x, top_y), font=font_label, color=COLOR_GRAY, anchor="lm"
-                )
-                ctx.draw_text(
-                    value_text,
-                    (x + width - padding, top_y),
-                    font=font_value,
-                    color=COLOR_WHITE,
-                    anchor="rm",
+                # Label fits - add label, spacer, value
+                top_row_children.extend(
+                    [
+                        Text(text=label_text, font="small", color=COLOR_GRAY, align="start"),
+                        Spacer(),
+                        Text(text=value_text, font="regular", color=COLOR_WHITE, align="end"),
+                    ]
                 )
             else:
-                # Not enough space - draw value only, left-aligned after icon
-                ctx.draw_text(
-                    value_text, (text_x, top_y), font=font_value, color=COLOR_WHITE, anchor="lm"
+                # Not enough space - value only
+                top_row_children.append(
+                    Text(text=value_text, font="regular", color=COLOR_WHITE, align="start")
                 )
 
-            # Progress bar
-            bar_y = y + int(height * 0.60)
-            percent_width = int(width * 0.22)
-            bar_rect = (x + padding, bar_y, x + width - percent_width, bar_y + bar_height)
-            ctx.draw_bar(bar_rect, percent, self.color, COLOR_DARK_GRAY)
+            # Bottom row: Bar + Percent
+            bottom_row_children = [
+                Bar(
+                    percent=percent,
+                    color=self.color,
+                    background=COLOR_DARK_GRAY,
+                    height=bar_height,
+                ),
+                Text(text=f"{percent:.0f}%", font="small", color=COLOR_WHITE, align="end"),
+            ]
 
-            # Percentage
-            ctx.draw_text(
-                f"{percent:.0f}%",
-                (x + width - padding, bar_y + bar_height // 2),
-                font=font_percent,
-                color=COLOR_WHITE,
-                anchor="rm",
-            )
+            # Build column with two rows
+            Column(
+                children=[
+                    Row(children=top_row_children, gap=4, align="center", padding=padding),
+                    Row(children=bottom_row_children, gap=8, align="center", padding=padding),
+                ],
+                gap=int(height * 0.10),
+                justify="center",
+            ).render(ctx, x, y, width, height)
 
 
 class ProgressWidget(Widget):
@@ -213,28 +205,31 @@ class MultiProgressDisplay(Component):
 
     def render(self, ctx: RenderContext, x: int, y: int, width: int, height: int) -> None:
         """Render multi-progress list."""
-        font_title = ctx.get_font("small")
-        font_label = ctx.get_font("tiny")
-
         padding = int(width * 0.05)
-        current_y = y + padding
-
-        if self.title:
-            ctx.draw_text(
-                self.title.upper(),
-                (x + padding, current_y),
-                font=font_title,
-                color=COLOR_GRAY,
-                anchor="lm",
-            )
-            current_y += int(height * 0.14)
-
-        available_height = y + height - current_y - padding
         row_count = len(self.items) or 1
+
+        # Calculate sizes
+        title_height = int(height * 0.14) if self.title else 0
+        available_height = height - title_height - padding * 2
         row_height = min(int(height * 0.35), available_height // row_count)
         bar_height = max(4, int(height * 0.06))
         icon_size = max(8, int(height * 0.09))
 
+        # Build component tree
+        children = []
+
+        # Add title if present
+        if self.title:
+            children.append(
+                Row(
+                    children=[
+                        Text(text=self.title.upper(), font="small", color=COLOR_GRAY, align="start")
+                    ],
+                    padding=padding,
+                )
+            )
+
+        # Build each progress item row
         for item in self.items:
             label = item.get("label", "Item")
             value = item.get("value", 0)
@@ -244,45 +239,46 @@ class MultiProgressDisplay(Component):
             unit = item.get("unit", "")
 
             percent = min(100, (value / target) * 100) if target > 0 else 0
-
-            label_x = x + padding
-            if icon:
-                ctx.draw_icon(icon, (x + padding, current_y + 2), size=icon_size, color=color)
-                label_x = x + padding + icon_size + 4
-
-            ctx.draw_text(
-                label.upper(),
-                (label_x, current_y + int(row_height * 0.2)),
-                font=font_label,
-                color=COLOR_GRAY,
-                anchor="lm",
-            )
-
             value_text = f"{value:.0f}/{target:.0f}"
             if unit:
                 value_text += f" {unit}"
-            ctx.draw_text(
-                value_text,
-                (x + width - padding, current_y + int(row_height * 0.2)),
-                font=font_label,
-                color=COLOR_WHITE,
-                anchor="rm",
+
+            # Top row: Icon + Label + Spacer + Value
+            top_row_children = []
+            if icon:
+                top_row_children.append(Icon(name=icon, size=icon_size, color=color))
+            top_row_children.extend(
+                [
+                    Text(text=label.upper(), font="tiny", color=COLOR_GRAY, align="start"),
+                    Spacer(),
+                    Text(text=value_text, font="tiny", color=COLOR_WHITE, align="end"),
+                ]
             )
 
-            bar_y = current_y + int(row_height * 0.55)
-            percent_width = int(width * 0.20)
-            bar_rect = (x + padding, bar_y, x + width - percent_width, bar_y + bar_height)
-            ctx.draw_bar(bar_rect, percent, color, COLOR_DARK_GRAY)
+            # Bottom row: Bar + Percent
+            bottom_row_children = [
+                Bar(percent=percent, color=color, background=COLOR_DARK_GRAY, height=bar_height),
+                Text(text=f"{percent:.0f}%", font="tiny", color=COLOR_WHITE, align="end"),
+            ]
 
-            ctx.draw_text(
-                f"{percent:.0f}%",
-                (x + width - padding, bar_y + bar_height // 2),
-                font=font_label,
-                color=COLOR_WHITE,
-                anchor="rm",
+            # Combine into a column for this item
+            item_column = Column(
+                children=[
+                    Row(children=top_row_children, gap=4, align="center", padding=padding),
+                    Row(children=bottom_row_children, gap=8, align="center", padding=padding),
+                ],
+                gap=int(row_height * 0.15),
+                justify="center",
             )
+            children.append(item_column)
 
-            current_y += row_height
+        # Render the entire column
+        Column(
+            children=children,
+            gap=int(height * 0.02),
+            justify="start",
+            padding=0,
+        ).render(ctx, x, y, width, height)
 
 
 class MultiProgressWidget(Widget):

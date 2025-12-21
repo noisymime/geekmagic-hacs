@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from ..const import COLOR_CYAN, COLOR_GRAY, COLOR_WHITE
 from .base import Widget, WidgetConfig
-from .components import Color, Component
+from .components import Bar, Color, Column, Component, Icon, Row, Spacer, Text
 
 if TYPE_CHECKING:
     from ..render_context import RenderContext
@@ -46,10 +46,6 @@ class NowPlaying(Component):
 
     def render(self, ctx: RenderContext, x: int, y: int, width: int, height: int) -> None:
         """Render now playing info."""
-        center_x = x + width // 2
-        font_label = ctx.get_font("small")
-        font_title = ctx.get_font("regular")
-        font_small = ctx.get_font("small")
         padding = int(width * 0.05)
 
         # Truncate text
@@ -58,57 +54,52 @@ class NowPlaying(Component):
         artist = (
             self.artist[: max_chars - 2] + ".." if len(self.artist) > max_chars else self.artist
         )
+        album = self.album[: max_chars - 2] + ".." if len(self.album) > max_chars else self.album
 
-        current_y = y + int(height * 0.12)
+        # Build component tree
+        children = [
+            Text("NOW PLAYING", font="small", color=COLOR_GRAY),
+            Spacer(min_size=int(height * 0.03)),
+            Text(title, font="regular", color=COLOR_WHITE),
+        ]
 
-        # Draw "NOW PLAYING"
-        ctx.draw_text(
-            "NOW PLAYING", (center_x, current_y), font=font_label, color=COLOR_GRAY, anchor="mm"
-        )
-        current_y += int(height * 0.20)
-
-        # Draw title
-        ctx.draw_text(title, (center_x, current_y), font=font_title, color=COLOR_WHITE, anchor="mm")
-        current_y += int(height * 0.17)
-
-        # Draw artist
         if self.show_artist and artist:
-            ctx.draw_text(
-                artist, (center_x, current_y), font=font_small, color=COLOR_GRAY, anchor="mm"
-            )
-            current_y += int(height * 0.15)
+            children.append(Spacer(min_size=int(height * 0.02)))
+            children.append(Text(artist, font="small", color=COLOR_GRAY))
 
-        # Draw album
         if self.show_album and self.album:
-            album = (
-                self.album[: max_chars - 2] + ".." if len(self.album) > max_chars else self.album
-            )
-            ctx.draw_text(
-                album, (center_x, current_y), font=font_small, color=COLOR_GRAY, anchor="mm"
-            )
+            children.append(Spacer(min_size=int(height * 0.02)))
+            children.append(Text(album, font="small", color=COLOR_GRAY))
 
-        # Draw progress bar
+        # Add spacer before progress section
+        children.append(Spacer())
+
+        # Progress bar and time labels
         if self.show_progress and self.duration > 0:
-            bar_height = max(4, int(height * 0.05))
-            bar_y = y + height - int(height * 0.21)
-            bar_rect = (x + padding, bar_y, x + width - padding, bar_y + bar_height)
             progress = min(100, (self.position / self.duration) * 100)
-            ctx.draw_bar(bar_rect, progress, color=self.color)
-
-            # Draw time
             pos_str = _format_time(self.position)
             dur_str = _format_time(self.duration)
-            time_y = bar_y + int(height * 0.12)
-            ctx.draw_text(
-                pos_str, (x + padding, time_y), font=font_small, color=COLOR_GRAY, anchor="lm"
+
+            children.extend(
+                [
+                    Bar(
+                        percent=progress,
+                        color=self.color,
+                        height=max(4, int(height * 0.05)),
+                    ),
+                    Spacer(min_size=int(height * 0.02)),
+                    Row(
+                        children=[
+                            Text(pos_str, font="small", color=COLOR_GRAY, align="start"),
+                            Spacer(),
+                            Text(dur_str, font="small", color=COLOR_GRAY, align="end"),
+                        ]
+                    ),
+                ]
             )
-            ctx.draw_text(
-                dur_str,
-                (x + width - padding, time_y),
-                font=font_small,
-                color=COLOR_GRAY,
-                anchor="rm",
-            )
+
+        # Render the column
+        Column(children=children, padding=padding, align="center").render(ctx, x, y, width, height)
 
 
 @dataclass
@@ -120,38 +111,19 @@ class MediaIdle(Component):
 
     def render(self, ctx: RenderContext, x: int, y: int, width: int, height: int) -> None:
         """Render paused state."""
-        center_x = x + width // 2
-        center_y = y + height // 2
-        font_label = ctx.get_font("small")
+        # Calculate icon size
+        icon_size = max(24, int(height * 0.25))
 
-        # Draw pause icon
-        bar_width = max(4, int(width * 0.04))
-        bar_height = max(15, int(height * 0.25))
-        gap = max(5, int(width * 0.05))
-
-        left_bar = (
-            center_x - gap - bar_width,
-            center_y - bar_height // 2,
-            center_x - gap,
-            center_y + bar_height // 2,
-        )
-        right_bar = (
-            center_x + gap,
-            center_y - bar_height // 2,
-            center_x + gap + bar_width,
-            center_y + bar_height // 2,
-        )
-
-        ctx.draw_rect(left_bar, fill=COLOR_GRAY)
-        ctx.draw_rect(right_bar, fill=COLOR_GRAY)
-
-        ctx.draw_text(
-            "PAUSED",
-            (center_x, center_y + int(height * 0.29)),
-            font=font_label,
-            color=COLOR_GRAY,
-            anchor="mm",
-        )
+        # Build component tree
+        Column(
+            children=[
+                Icon("pause", size=icon_size, color=COLOR_GRAY),
+                Spacer(min_size=int(height * 0.08)),
+                Text("PAUSED", font="small", color=COLOR_GRAY),
+            ],
+            align="center",
+            justify="center",
+        ).render(ctx, x, y, width, height)
 
 
 class MediaWidget(Widget):
