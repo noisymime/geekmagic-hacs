@@ -98,14 +98,17 @@ class WeatherDisplay(Component):
         """Render weather."""
         icon_name = WEATHER_ICONS.get(self.condition, "weather-sunny")
 
-        # Use standard size categories - show forecast in SMALL or larger
+        # Use standard size categories for responsive layout
         size = get_size_category(height)
-        is_compact = size in (SizeCategory.MICRO, SizeCategory.TINY)
-        show_full_layout = not is_compact and self.show_forecast
 
-        if show_full_layout:
+        if size in (SizeCategory.MEDIUM, SizeCategory.LARGE) and self.show_forecast:
+            # Full layout with detailed forecast
             component = self._build_full(ctx, width, height, icon_name)
+        elif size == SizeCategory.SMALL and self.show_forecast and self.forecast:
+            # Semi-compact: current weather + mini forecast icons
+            component = self._build_semi_compact(ctx, width, height, icon_name)
         else:
+            # Compact: just current weather
             component = self._build_compact(ctx, width, height, icon_name)
 
         component.render(ctx, x, y, width, height)
@@ -232,6 +235,61 @@ class WeatherDisplay(Component):
             )
         # Just main weather
         return main_weather
+
+    def _build_semi_compact(
+        self,
+        ctx: RenderContext,
+        width: int,
+        height: int,
+        icon_name: str,
+    ) -> Component:
+        """Build semi-compact layout with mini forecast icons."""
+        padding = int(width * 0.04)
+        icon_size = max(16, min(28, int(height * 0.28)))
+        mini_icon_size = max(10, int(height * 0.12))
+        temp_str = f"{self.temperature}°" if self.temperature != "--" else "--"
+
+        # Top row: current weather (icon + temp)
+        top_row = Row(
+            children=[
+                Icon(icon_name, size=icon_size, color=COLOR_GOLD),
+                Text(temp_str, font="large", color=THEME_TEXT_PRIMARY),
+            ],
+            gap=4,
+            align="center",
+            justify="center",
+        )
+
+        # Bottom row: mini forecast icons (3 days, icons only)
+        forecast_icons: list[Component] = []
+        for day in self.forecast[: min(3, self.forecast_days)]:
+            day_condition = day.get("condition", "sunny")
+            day_icon = WEATHER_ICONS.get(day_condition, "weather-sunny")
+            forecast_icons.append(Icon(day_icon, size=mini_icon_size, color=THEME_TEXT_SECONDARY))
+
+        bottom_row = (
+            Row(
+                children=forecast_icons,
+                gap=int(width * 0.08),
+                align="center",
+                justify="center",
+            )
+            if forecast_icons
+            else None
+        )
+
+        # Stack vertically
+        children: list[Component] = [top_row]
+        if bottom_row:
+            children.append(bottom_row)
+
+        return Column(
+            children=children,
+            gap=int(height * 0.08),
+            padding=padding,
+            align="center",
+            justify="center",
+        )
 
     def _build_compact(
         self,
