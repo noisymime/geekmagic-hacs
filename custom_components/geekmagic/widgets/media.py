@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from PIL import Image
@@ -25,7 +26,58 @@ from .components import (
 
 if TYPE_CHECKING:
     from ..render_context import RenderContext
-    from .state import WidgetState
+    from .state import EntityState, WidgetState
+
+
+def _calculate_media_position(
+    entity: EntityState | None,
+    now: datetime | None,
+) -> float:
+    """Calculate current media position accounting for elapsed playback time.
+
+    Home Assistant's media_position only updates on state changes (play/pause/seek).
+    To get the actual current position, we need to add elapsed time since the
+    last update when the player is actively playing.
+
+    Args:
+        entity: Media player entity state
+        now: Current datetime (timezone-aware)
+
+    Returns:
+        Current position in seconds
+    """
+    if entity is None:
+        return 0.0
+
+    # Get base position
+    position = float(entity.get("media_position", 0) or 0)
+
+    # Only calculate elapsed time if playing and we have timing info
+    if entity.state != "playing" or now is None:
+        return position
+
+    # Get the timestamp when position was last updated
+    updated_at = entity.get("media_position_updated_at")
+    if updated_at is None:
+        return position
+
+    # Parse the datetime if it's a string (HA stores as ISO format)
+    if isinstance(updated_at, str):
+        try:
+            updated_at = datetime.fromisoformat(updated_at)
+        except (ValueError, TypeError):
+            return position
+
+    # Calculate elapsed time since last update
+    if hasattr(updated_at, "timestamp"):
+        elapsed = now.timestamp() - updated_at.timestamp()
+        if elapsed > 0:
+            # Add elapsed time, but cap at duration if available
+            duration = float(entity.get("media_duration", 0) or 0)
+            new_position = position + elapsed
+            return min(new_position, duration) if duration > 0 else new_position
+
+    return position
 
 
 def _format_time(seconds: float) -> str:
@@ -326,14 +378,18 @@ class MediaWidget(Widget):
         if entity is None or entity.state in ("off", "unavailable", "unknown", "idle"):
             return MediaIdle()
 
+        # Calculate current position (accounts for elapsed playback time)
+        position = _calculate_media_position(entity, state.now)
+        duration = entity.get("media_duration", 0) or 0
+
         # Use album art if available and enabled
         if self.show_album_art and state.image is not None:
             return AlbumArt(
                 image=state.image.convert("RGB") if state.image.mode != "RGB" else state.image,
                 title=entity.get("media_title", ""),
                 artist=entity.get("media_artist", ""),
-                position=entity.get("media_position", 0),
-                duration=entity.get("media_duration", 0),
+                position=position,
+                duration=duration,
                 color=self.config.color or COLOR_CYAN,
                 show_progress=self.show_progress,
                 show_overlay=True,
@@ -343,8 +399,8 @@ class MediaWidget(Widget):
             title=entity.get("media_title", "Unknown"),
             artist=entity.get("media_artist", ""),
             album=entity.get("media_album_name", ""),
-            position=entity.get("media_position", 0),
-            duration=entity.get("media_duration", 0),
+            position=position,
+            duration=duration,
             color=self.config.color or COLOR_CYAN,
             show_artist=self.show_artist,
             show_album=self.show_album,
