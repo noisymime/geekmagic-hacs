@@ -758,6 +758,15 @@ export class GeekMagicPanel extends LitElement {
   private _updateWidget(slot: number, updates: Partial<WidgetConfig>): void {
     if (!this._editingView) return;
 
+    // Auto-populate timezone when switching to clock widget
+    if (updates.type === "clock") {
+      const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      updates = {
+        ...updates,
+        options: { ...updates.options, timezone: browserTz },
+      };
+    }
+
     const widgets = [...this._editingView.widgets];
     const existingIndex = widgets.findIndex((w) => w.slot === slot);
 

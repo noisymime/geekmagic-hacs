@@ -504,8 +504,8 @@ class Oe {
     S(this, e);
   }
 }
-const B = O.litHtmlPolyfillSupport;
-B == null || B(H, M), (O.litHtmlVersions ?? (O.litHtmlVersions = [])).push("3.3.1");
+const F = O.litHtmlPolyfillSupport;
+F == null || F(H, M), (O.litHtmlVersions ?? (O.litHtmlVersions = [])).push("3.3.1");
 const Ie = (s, e, t) => {
   const i = (t == null ? void 0 : t.renderBefore) ?? e;
   let r = i._$litPart$;
@@ -548,8 +548,8 @@ class I extends E {
 }
 var oe;
 I._$litElement$ = !0, I.finalized = !0, (oe = x.litElementHydrateSupport) == null || oe.call(x, { LitElement: I });
-const F = x.litElementPolyfillSupport;
-F == null || F({ LitElement: I });
+const B = x.litElementPolyfillSupport;
+B == null || B({ LitElement: I });
 (x.litElementVersions ?? (x.litElementVersions = [])).push("4.2.1");
 /**
  * @license
@@ -715,6 +715,13 @@ let g = class extends I {
   }
   _updateWidget(s, e) {
     if (!this._editingView) return;
+    if (e.type === "clock") {
+      const r = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      e = {
+        ...e,
+        options: { ...e.options, timezone: r }
+      };
+    }
     const t = [...this._editingView.widgets], i = t.findIndex((r) => r.slot === s);
     i >= 0 ? t[i] = { ...t[i], ...e } : t.push({ slot: s, type: "", ...e }), this._editingView = { ...this._editingView, widgets: [...t] }, this.requestUpdate(), this._refreshPreview();
   }
