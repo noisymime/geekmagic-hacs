@@ -1090,8 +1090,9 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         """
         from homeassistant.components.camera import async_get_image
 
-        # Find all camera widgets in current layout
+        # Find all camera/image widgets in current layout
         camera_entity_ids: set[str] = set()
+        other_entity_ids: set[str] = set()
 
         if self._layouts and 0 <= self._current_screen < len(self._layouts):
             layout = self._layouts[self._current_screen]
@@ -1099,17 +1100,23 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
                 if slot.widget and isinstance(slot.widget, CameraWidget):
                     entity_id = slot.widget.config.entity_id
                     if entity_id:
-                        camera_entity_ids.add(entity_id)
+                        if entity_id.startswith("camera."):
+                            camera_entity_ids.add(entity_id)
+                        else:
+                            other_entity_ids.add(entity_id)
 
-        # Also fetch image for camera in notification
+        # Also collect entities from notification
         if self._notification_data:
-            image_url = self._notification_data.get("image")
-            if image_url:
-                if image_url.startswith("camera."):
-                    camera_entity_ids.add(image_url)
+            image_source = self._notification_data.get("image")
+            if image_source:
+                if image_source.startswith("camera."):
+                    camera_entity_ids.add(image_source)
                 else:
-                    # Treat as Home Assistant entity with entity_picture
-                    await self._async_fetch_url_image_to_cache(image_url)
+                    other_entity_ids.add(image_source)
+
+        # Fetch non-camera entities first (they populate the same cache)
+        for entity_id in other_entity_ids:
+            await self._async_fetch_url_image_to_cache(entity_id)
 
         # Fetch images for each camera
         for entity_id in camera_entity_ids:
@@ -1142,9 +1149,13 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         if not image_url or not image_url.startswith("/"):
             return
 
-        # Use internal URL from HA config
-        base_url = self.hass.config.internal_url
+        # Use internal URL from HA config, but fall back to external_url if needed
+        base_url = (
+            self.hass.config.internal_url
+            or getattr(self.hass.config, "external_url", None)
+        )
         if not base_url:
+            _LOGGER.debug("No base URL available for entity picture fetch")
             return
 
         # Ensure base_url doesn't have trailing slash and image_url has leading slash
@@ -1153,7 +1164,7 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         try:
             async with (
                 aiohttp.ClientSession() as session,
-                session.get(image_url, timeout=aiohttp.ClientTimeout(total=10)) as response,
+                session.get(full_url, timeout=aiohttp.ClientTimeout(total=10)) as response,
             ):
                 if response.status == 200:
                     image_data = await response.read()
@@ -1218,8 +1229,11 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
                 self._media_images.pop(entity_id, None)
                 continue
 
-            # Use internal URL from HA config
-            base_url = self.hass.config.internal_url
+            # Use internal URL from HA config, but fall back to external_url if needed
+            base_url = (
+                self.hass.config.internal_url
+                or getattr(self.hass.config, "external_url", None)
+            )
             if not base_url:
                 continue
 
