@@ -22,11 +22,11 @@ notify:
       selector:
         icon:
     image:
-      name: Image URL
-      description: Optional image URL or path to display instead of icon.
+      name: Image Entity
+      description: Home Assistant entity to use for the image (e.g., camera.front_door, image.last_person, or media_player.spotify).
       required: false
       selector:
-        text:
+        entity: {}
     duration:
       name: Duration
       description: How long to show the notification in seconds (default 10).
