@@ -11,7 +11,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from ..const import DOMAIN
+from ..const import DEFAULT_JPEG_QUALITY, DOMAIN
 from .base import GeekMagicEntity
 
 if TYPE_CHECKING:
@@ -153,8 +153,6 @@ class GeekMagicJpegQualityNumber(GeekMagicEntity, NumberEntity):
     @property
     def native_value(self) -> float | None:
         """Return current JPEG quality."""
-        from ..const import DEFAULT_JPEG_QUALITY
-
         return self.coordinator.options.get("jpeg_quality", DEFAULT_JPEG_QUALITY)
 
     async def async_set_native_value(self, value: float) -> None:

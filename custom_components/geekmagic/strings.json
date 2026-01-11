@@ -12,11 +12,17 @@
       },
       "screen_count": {
         "name": "Screen Count"
+      },
+      "jpeg_quality": {
+        "name": "Image Quality"
+      },
+      "cycle_interval": {
+        "name": "View Cycle Interval"
       }
     },
     "button": {
-      "refresh_now": {
-        "name": "Refresh Now"
+      "refresh": {
+        "name": "Refresh Display"
       },
       "next_screen": {
         "name": "Next Screen"
@@ -29,19 +35,19 @@
       "status": {
         "name": "Status"
       },
-      "current_screen_name": {
-        "name": "Current Screen"
+      "storage_used": {
+        "name": "Storage Used"
+      },
+      "storage_free": {
+        "name": "Storage Free"
       }
     },
     "select": {
-      "current_screen": {
-        "name": "Current Screen"
+      "display": {
+        "name": "Display"
       },
-      "screen_layout": {
-        "name": "Layout"
-      },
-      "slot_widget": {
-        "name": "Widget"
+      "display_rotation": {
+        "name": "Display Rotation"
       }
     },
     "text": {
