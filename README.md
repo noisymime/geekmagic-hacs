@@ -374,6 +374,12 @@ Should work with any GeekMagic device that supports the `/doUpload` HTTP API.
 
 **Important:** This integration works with the **stock firmware** that ships with GeekMagic devices. No custom firmware or flashing required - just connect your device to your network and add the integration.
 
+### Alternative Firmware
+
+For users interested in open-source firmware, [@bvweerd](https://github.com/bvweerd) has created an ESP8266 firmware that implements the same API:
+
+- [geekmagic-tv-esp8266](https://github.com/bvweerd/geekmagic-tv-esp8266) - Open-source firmware for GeekMagic devices
+
 ## Development
 
 ```bash
