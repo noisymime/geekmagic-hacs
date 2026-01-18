@@ -37,7 +37,9 @@ Create small, focused commits that each represent a single logical change:
 3. **After adding tests** → commit the tests
 4. **After refactoring** → commit the refactor
 
-Run tests before committing to validate changes: `uv run pytest`
+**Always run pre-commit before committing**: `uv run pre-commit run --all`
+
+This validates tests, linting, formatting, and type checking in one command.
 
 ### Examples
 ```bash
