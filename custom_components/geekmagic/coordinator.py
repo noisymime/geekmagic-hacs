@@ -8,8 +8,12 @@ import time
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
 
+if TYPE_CHECKING:
+    import asyncio
+
 from homeassistant.const import __version__ as ha_version
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -39,6 +43,7 @@ from .const import (
     LAYOUT_HERO,
     LAYOUT_HERO_BL,
     LAYOUT_HERO_BR,
+    LAYOUT_HERO_SIMPLE,
     LAYOUT_HERO_TL,
     LAYOUT_HERO_TR,
     LAYOUT_SIDEBAR_LEFT,
@@ -56,6 +61,7 @@ from .layouts.corner_hero import HeroCornerBL, HeroCornerBR, HeroCornerTL, HeroC
 from .layouts.fullscreen import FullscreenLayout
 from .layouts.grid import Grid2x2, Grid2x3, Grid3x2, Grid3x3
 from .layouts.hero import HeroLayout
+from .layouts.hero_simple import HeroSimpleLayout
 from .layouts.sidebar import SidebarLeft, SidebarRight
 from .layouts.split import (
     SplitHorizontal,
@@ -72,6 +78,7 @@ from .widgets.chart import ChartWidget
 from .widgets.clock import ClockWidget
 from .widgets.entity import EntityWidget
 from .widgets.gauge import GaugeWidget
+from .widgets.icon import IconWidget
 from .widgets.media import MediaWidget
 from .widgets.progress import MultiProgressWidget, ProgressWidget
 from .widgets.state import EntityState, WidgetState
@@ -95,6 +102,7 @@ LAYOUT_CLASSES = {
     LAYOUT_GRID_3X2: Grid3x2,
     LAYOUT_GRID_3X3: Grid3x3,
     LAYOUT_HERO: HeroLayout,
+    LAYOUT_HERO_SIMPLE: HeroSimpleLayout,
     LAYOUT_SPLIT_H: SplitHorizontal,
     LAYOUT_SPLIT_H_1_2: SplitHorizontal1To2,
     LAYOUT_SPLIT_H_2_1: SplitHorizontal2To1,
@@ -123,6 +131,7 @@ WIDGET_CLASSES = {
     "status": StatusWidget,
     "status_list": StatusListWidget,
     "weather": WeatherWidget,
+    "icon": IconWidget,
 }
 
 
@@ -214,6 +223,11 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         self._device_brightness: int | None = None
         self._last_brightness_poll: float = 0  # Timestamp of last brightness poll
         self._brightness_poll_interval: float = 600  # 10 minutes
+
+        # Notification state
+        self._notification_expiry: float = 0
+        self._notification_data: dict[str, Any] | None = None
+        self._notification_clear_handle: asyncio.TimerHandle | None = None
 
         # Display mode tracking
         # "custom" = integration renders views, "builtin" = device shows built-in mode
@@ -658,6 +672,12 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         # Render current screen's layout
         if self._layouts and 0 <= self._current_screen < len(self._layouts):
             layout = self._layouts[self._current_screen]
+
+            # Check for active notification
+            if time.time() < self._notification_expiry and self._notification_data:
+                _LOGGER.debug("Rendering active notification")
+                layout = self._create_notification_layout(self._notification_data)
+
             _LOGGER.debug(
                 "Rendering layout %s with %d widgets",
                 type(layout).__name__,
@@ -681,6 +701,138 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         png_data = self.renderer.to_png(img, rotation=rotation)
 
         return jpeg_data, png_data
+
+    async def trigger_notification(self, data: dict[str, Any]) -> None:
+        """Trigger a notification on this device.
+
+        Args:
+            data: Notification data (message, title, icon, duration, etc.)
+        """
+        duration = data.get("duration", 10)
+        self._notification_data = data
+        self._notification_expiry = time.time() + duration
+
+        # Cancel any pending clear callback to prevent race conditions
+        if self._notification_clear_handle is not None:
+            self._notification_clear_handle.cancel()
+
+        # Schedule cleanup and store handle for potential cancellation
+        self._notification_clear_handle = self.hass.loop.call_later(
+            duration, self._clear_notification
+        )
+
+        # Force immediate refresh
+        await self.async_request_refresh()
+
+    def _clear_notification(self) -> None:
+        """Clear the active notification and refresh."""
+        self._notification_expiry = 0
+        self._notification_data = None
+        self._notification_clear_handle = None
+        # Use fire-and-forget for the refresh since this is a callback
+        self.hass.async_create_task(self.async_request_refresh())
+
+    def _create_notification_layout(self, data: dict[str, Any]) -> Layout:
+        """Create a layout for a notification.
+
+        Args:
+            data: Notification data
+
+        Returns:
+            Layout: HeroSimpleLayout (with message) or FullscreenLayout (image only)
+        """
+        message = data.get("message")
+
+        # Scenario 1: No message -> Fullscreen Layout (Image/Icon only)
+        if not message:
+            layout = FullscreenLayout()
+            # Apply theme if specified
+            theme_name = data.get("theme", THEME_CLASSIC)
+            layout.theme = get_theme(theme_name)
+
+            hero_widget = None
+            image_url = data.get("image")
+
+            if image_url:
+                hero_widget = CameraWidget(
+                    WidgetConfig(
+                        widget_type="camera",
+                        slot=0,
+                        entity_id=image_url,
+                        options={
+                            # contain ensures full image visible, cover fills screen
+                            "fit": "contain",
+                        },
+                    )
+                )
+
+            if not hero_widget:
+                # Default to Icon
+                icon = data.get("icon", "mdi:bell-ring")
+                hero_widget = IconWidget(
+                    WidgetConfig(
+                        widget_type="icon",
+                        slot=0,
+                        color=COLOR_CYAN,
+                        options={
+                            "icon": icon,
+                            "size": "huge",  # This option is now supported by IconWidget
+                            "show_panel": False,  # Clean fullscreen look
+                        },
+                    )
+                )
+            layout.set_widget(0, hero_widget)
+            return layout
+
+        # Scenario 2: Message exists -> Hero Simple Layout
+        layout = HeroSimpleLayout()
+
+        # Apply theme if specified
+        theme_name = data.get("theme", THEME_CLASSIC)
+        layout.theme = get_theme(theme_name)
+
+        # Slot 0 (Hero): Icon or Image
+        hero_widget = None
+        image_url = data.get("image")
+        if image_url:
+            hero_widget = CameraWidget(
+                WidgetConfig(
+                    widget_type="camera", slot=0, entity_id=image_url, options={"fit": "contain"}
+                )
+            )
+
+        if not hero_widget:
+            # Default to Icon
+            icon = data.get("icon", "mdi:bell-ring")
+            hero_widget = IconWidget(
+                WidgetConfig(
+                    widget_type="icon",
+                    slot=0,
+                    color=COLOR_CYAN,
+                    options={
+                        "icon": icon,
+                        "size": "huge",  # Force huge icon
+                    },
+                )
+            )
+        layout.set_widget(0, hero_widget)
+
+        # Slot 1 (Footer): Message only (Title removed per request)
+        text_widget = TextWidget(
+            WidgetConfig(
+                widget_type="text",
+                slot=1,
+                color=COLOR_WHITE,
+                options={
+                    "text": message,
+                    "size": "medium",
+                    "align": "center",
+                },
+            )
+        )
+        layout.set_widget(1, text_widget)
+
+        return layout
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data and update display.
@@ -950,8 +1102,9 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         """
         from homeassistant.components.camera import async_get_image
 
-        # Find all camera widgets in current layout
+        # Find all camera/image widgets in current layout
         camera_entity_ids: set[str] = set()
+        other_entity_ids: set[str] = set()
 
         if self._layouts and 0 <= self._current_screen < len(self._layouts):
             layout = self._layouts[self._current_screen]
@@ -959,7 +1112,23 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
                 if slot.widget and isinstance(slot.widget, CameraWidget):
                     entity_id = slot.widget.config.entity_id
                     if entity_id:
-                        camera_entity_ids.add(entity_id)
+                        if entity_id.startswith("camera."):
+                            camera_entity_ids.add(entity_id)
+                        else:
+                            other_entity_ids.add(entity_id)
+
+        # Also collect entities from notification
+        if self._notification_data:
+            image_source = self._notification_data.get("image")
+            if image_source:
+                if image_source.startswith("camera."):
+                    camera_entity_ids.add(image_source)
+                else:
+                    other_entity_ids.add(image_source)
+
+        # Fetch non-camera entities first (they populate the same cache)
+        for entity_id in other_entity_ids:
+            await self._async_fetch_url_image_to_cache(entity_id)
 
         # Fetch images for each camera
         for entity_id in camera_entity_ids:
@@ -974,6 +1143,52 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
                     )
             except Exception as e:
                 _LOGGER.debug("Failed to fetch camera image for %s: %s", entity_id, e)
+
+    async def _async_fetch_url_image_to_cache(self, source: str) -> None:
+        """Fetch image from entity_picture and save to camera image cache.
+
+        Args:
+            source: Entity ID
+        """
+        # Get state for the entity
+        image_url = None
+        state = self.hass.states.get(source)
+        if state:
+            image_url = state.attributes.get("entity_picture")
+
+        # Only allow internal Home Assistant URLs (starting with /)
+        if not image_url or not image_url.startswith("/"):
+            return
+
+        # Use internal URL from HA config, but fall back to external_url if needed
+        base_url = self.hass.config.internal_url or getattr(self.hass.config, "external_url", None)
+        if not base_url:
+            _LOGGER.debug("No base URL available for entity picture fetch")
+            return
+
+        # Ensure base_url doesn't have trailing slash and image_url has leading slash
+        full_url = f"{base_url.rstrip('/')}/{image_url.lstrip('/')}"
+
+        try:
+            # Use Home Assistant's managed session for proper SSL/auth handling
+            session = async_get_clientsession(self.hass)
+            async with session.get(full_url, timeout=10) as response:
+                if response.status == 200:
+                    image_data = await response.read()
+                    self._camera_images[source] = image_data
+                    _LOGGER.debug(
+                        "Fetched image for notification from %s: %d bytes",
+                        source,
+                        len(image_data),
+                    )
+                else:
+                    _LOGGER.debug(
+                        "Failed to fetch notification image from %s: HTTP %d",
+                        source,
+                        response.status,
+                    )
+        except Exception as e:
+            _LOGGER.debug("Failed to fetch notification image from %s: %s", source, e)
 
     def get_camera_image(self, entity_id: str) -> bytes | None:
         """Get pre-fetched camera image.
@@ -1014,20 +1229,22 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
             if state is None:
                 continue
 
-            # Get entity_picture URL from attributes
+            # Get entity_picture from attributes
             entity_picture = state.attributes.get("entity_picture")
-            if not entity_picture:
-                # Clear any cached image if no picture available
+            if not entity_picture or not entity_picture.startswith("/"):
+                # Clear any cached image if no internal picture available
                 self._media_images.pop(entity_id, None)
                 continue
 
-            # Build full URL if relative
-            if entity_picture.startswith("/"):
-                # Use internal Home Assistant URL
-                base_url = self.hass.config.internal_url or "http://localhost:8123"
-                image_url = f"{base_url}{entity_picture}"
-            else:
-                image_url = entity_picture
+            # Use internal URL from HA config, but fall back to external_url if needed
+            base_url = self.hass.config.internal_url or getattr(
+                self.hass.config, "external_url", None
+            )
+            if not base_url:
+                continue
+
+            # Ensure base_url doesn't have trailing slash and entity_picture has leading slash
+            image_url = f"{base_url.rstrip('/')}/{entity_picture.lstrip('/')}"
 
             try:
                 async with (
