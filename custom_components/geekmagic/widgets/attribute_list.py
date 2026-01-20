@@ -12,15 +12,113 @@ from .components import (
     Color,
     Column,
     Component,
-    Row,
-    Spacer,
     Text,
+    _resolve_color,
 )
-from .helpers import estimate_max_chars, truncate_text
 
 if TYPE_CHECKING:
     from ..render_context import RenderContext
     from .state import WidgetState
+
+
+@dataclass
+class LabelValueRow(Component):
+    """A row with label on the left and value on the right, with proper truncation.
+
+    This component properly allocates width between label and value,
+    ensuring text is truncated based on actual pixel measurements rather
+    than character count estimates.
+    """
+
+    label: str
+    value: str
+    label_color: Color = THEME_TEXT_SECONDARY
+    value_color: Color = (0, 255, 255)
+    gap: int = 8  # Minimum gap between label and value
+
+    def measure(self, ctx: RenderContext, max_width: int, max_height: int) -> tuple[int, int]:
+        font = ctx.get_font("small", bold=False)
+        _, h = ctx.get_text_size("Hg", font)
+        return (max_width, h)
+
+    def _truncate_to_width(self, ctx: RenderContext, text: str, font: Any, max_width: int) -> str:
+        """Truncate text with ellipsis to fit within max_width."""
+        if max_width <= 0:
+            return ""
+        text_width, _ = ctx.get_text_size(text, font)
+        if text_width <= max_width:
+            return text
+        ellipsis = "…"
+        while len(text) > 1:
+            text = text[:-1]
+            test_text = text + ellipsis
+            text_width, _ = ctx.get_text_size(test_text, font)
+            if text_width <= max_width:
+                return test_text
+        return ellipsis
+
+    def render(self, ctx: RenderContext, x: int, y: int, width: int, height: int) -> None:
+        label_font = ctx.get_font("small", bold=False)
+        value_font = ctx.get_font("small", bold=True)
+
+        # Measure natural sizes
+        label_width, _ = ctx.get_text_size(self.label, label_font)
+        value_width, _ = ctx.get_text_size(self.value, value_font)
+
+        # Resolve colors
+        label_color = _resolve_color(self.label_color, ctx)
+        value_color = _resolve_color(self.value_color, ctx)
+
+        available = width - self.gap
+        total_needed = label_width + value_width
+
+        if total_needed <= available:
+            # Everything fits - no truncation needed
+            display_label = self.label
+            display_value = self.value
+            # Position: label at start, value at end
+            label_x = x
+            value_x = x + width
+        else:
+            # Need to truncate - allocate space proportionally
+            # Give slightly more space to value (40% label, 60% value when both overflow)
+            label_max = int(available * 0.40)
+            value_max = available - label_max
+
+            # But if one side doesn't need its full allocation, give extra to the other
+            if label_width <= label_max:
+                # Label fits, give remaining to value
+                value_max = available - label_width
+                display_label = self.label
+            elif value_width <= value_max:
+                # Value fits, give remaining to label
+                label_max = available - value_width
+                display_label = self._truncate_to_width(ctx, self.label, label_font, label_max)
+            else:
+                # Both need truncation
+                display_label = self._truncate_to_width(ctx, self.label, label_font, label_max)
+
+            display_value = self._truncate_to_width(ctx, self.value, value_font, value_max)
+            label_x = x
+            value_x = x + width
+
+        # Draw label (left-aligned)
+        ctx.draw_text(
+            display_label,
+            (label_x, y + height // 2),
+            label_font,
+            label_color,
+            anchor="lm",
+        )
+
+        # Draw value (right-aligned)
+        ctx.draw_text(
+            display_value,
+            (value_x, y + height // 2),
+            value_font,
+            value_color,
+            anchor="rm",
+        )
 
 
 @dataclass
@@ -48,31 +146,19 @@ class AttributeListDisplay(Component):
                     font="small",
                     color=THEME_TEXT_SECONDARY,
                     align="start",
+                    truncate=True,
                 )
             )
 
-        # Estimate max characters for label and value
-        max_label_len = estimate_max_chars(width // 2, char_width=7, padding=10)
-        max_value_len = estimate_max_chars(width // 2, char_width=7, padding=10)
-
-        # Build each item row
+        # Build each item row using LabelValueRow for proper truncation
         for label, value, color in self.items:
-            display_label = truncate_text(label, max_label_len, style="end")
-            display_value = truncate_text(str(value), max_value_len, style="end")
-
-            # Build row: Label ... Value
-            row_children = [
-                Text(text=display_label, font="small", color=THEME_TEXT_SECONDARY, align="start"),
-                Spacer(),
-                Text(text=display_value, font="small", color=color, align="end", bold=True),
-            ]
-
             rows.append(
-                Row(
-                    children=row_children,
+                LabelValueRow(
+                    label=label,
+                    value=str(value),
+                    label_color=THEME_TEXT_SECONDARY,
+                    value_color=color,
                     gap=6,
-                    align="center",
-                    justify="start",
                 )
             )
 
